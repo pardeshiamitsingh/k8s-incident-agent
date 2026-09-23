@@ -1,7 +1,7 @@
 # Spec: RAG knowledge base
 
 **Status:** draft
-**Constitution version this spec complies with:** 1.1.0
+**Constitution version this spec complies with:** 1.2.0
 
 ## Problem
 
@@ -53,8 +53,13 @@ alone with no grounding.
 - **Read-only RBAC:** Not applicable -- this spec never talks to the K8s
   API.
 - **Local-first, no external LLM calls:** Embeddings go exclusively through
-  Ollama's `nomic-embed-text` model (verified running locally in Phase 0);
-  no external embedding API is called.
+  Ollama's `nomic-embed-text` model (verified running locally in Phase 0),
+  wrapped via LangChain's `OllamaEmbeddings`; no external embedding API is
+  called. Uses the constitution's named exception (v1.2.0): LangSmith
+  tracing is enabled, so queries and retrieved chunk metadata are sent to
+  LangChain's hosted LangSmith for observability -- this is the one
+  permitted third-party call, opt-in via `LANGCHAIN_TRACING_V2` /
+  `LANGCHAIN_API_KEY` env vars, not hardcoded or on-by-default in code.
 - **Every diagnosis is explainable:** Every retrieved chunk carries its
   source runbook file and section heading, so a diagnosis can cite exactly
   which runbook section it drew from -- not just an opaque similarity
@@ -84,17 +89,23 @@ symptoms:
 ```
 
 **Module layout** (new `knowledge_base/` package, alongside `collectors/`):
+Built on LangChain's abstractions (constitution §3: "Framework | LangChain
+| Tool wrappers, retrievers, output parsing") rather than calling `chromadb`
+or `ollama` directly -- `OllamaEmbeddings` and the `Chroma` vector store
+wrapper give the ingestion/retrieval code the same local-only guarantees
+with a swappable interface Phase 3's LangGraph nodes can compose directly.
 - `knowledge_base/runbooks/*.md` -- the authored content (10-15 files).
 - `knowledge_base/models.py` -- `RunbookChunk`: `id`, `failure_class`,
   `section`, `text`, `source_file`.
-- `knowledge_base/embeddings.py` -- wraps Ollama's `nomic-embed-text` (via
-  its local HTTP API) to turn text into a vector.
+- `knowledge_base/embeddings.py` -- `get_embeddings()` returning a
+  `langchain_ollama.OllamaEmbeddings(model="nomic-embed-text")` instance.
 - `knowledge_base/ingest.py` -- `ingest_runbooks()`: reads every file under
-  `runbooks/`, chunks each by `##` section, embeds each chunk, upserts into
-  a Chroma `PersistentClient` collection named `runbooks` with metadata
-  (`failure_class`, `source_file`, `section`) alongside each chunk.
+  `runbooks/`, chunks each by `##` section, and upserts into a
+  `langchain_chroma.Chroma` vector store (persisted locally) via
+  `add_documents`/`delete`, with metadata (`failure_class`, `source_file`,
+  `section`) attached to each `Document`.
 - `knowledge_base/retrieve.py` -- `retrieve_runbooks(query, k=5) ->
-  list[RunbookChunk]`: embeds the query, queries the Chroma collection,
+  list[RunbookChunk]`: uses the Chroma vector store's retriever interface,
   returns hydrated, similarity-ranked `RunbookChunk` objects.
 
 **Chunking:** one chunk per `##` section within a runbook (`Diagnosis`,

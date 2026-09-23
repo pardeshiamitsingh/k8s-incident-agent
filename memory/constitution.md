@@ -36,7 +36,11 @@ rejected or the constitution amended first.
    application code could technically call them.
 3. **Local-first, no external LLM calls.** All reasoning and embedding calls
    go through local Ollama models. No incident data, logs, or cluster state
-   is sent to a third-party API.
+   is sent to a third-party API. **Named exception (v1.2.0):** LangSmith
+   tracing may send trace data (queries, retrieved runbook chunks and their
+   metadata, and later diagnosis prompts/completions) to LangChain's hosted
+   LangSmith service for observability. This is the sole named exception;
+   no other external API calls are permitted without a further amendment.
 4. **Every diagnosis is explainable.** The agent must cite which evidence
    (events/logs/metrics) and which retrieved knowledge-base entries led to
    its conclusion — no unexplained verdicts.
@@ -50,6 +54,7 @@ rejected or the constitution amended first.
 |---|---|---|
 | Orchestration | LangGraph | State machine for collect → classify → retrieve → diagnose → plan |
 | Framework | LangChain | Tool wrappers, retrievers, output parsing |
+| Observability | LangSmith (hosted) | Tracing only, named exception to principle 3 — see §2.3 |
 | LLM (reasoning) | Ollama, local model (start with `qwen2.5:14b` or `llama3.1:8b`, benchmark before locking in) | Must support reliable tool-calling |
 | Embeddings | Ollama (`nomic-embed-text` or `mxbai-embed-large`) | Local, no external calls |
 | Vector store | Chroma | Embedded, zero extra infra, local-first |
@@ -114,5 +119,13 @@ multi-cluster support, non-local/hosted LLM usage, Qdrant migration.
   Mission (§1), Principle 1 (§2), and Phase 5 (§4, renamed from "Trigger
   mechanism" to "Incident intake") reworded accordingly; autonomous/
   always-on operation moved to explicitly out-of-scope for v1.
+- **1.2.0** (2026-09-23): Carved out a named exception to Principle 3 (§2)
+  for LangSmith tracing — trace data (queries, retrieved runbook chunks,
+  and later diagnosis prompts/completions) may be sent to LangChain's
+  hosted LangSmith service for observability. This is a deliberate,
+  scoped trade of "fully local" for tracing/debugging value during
+  development; it is the *only* named exception to principle 3 and does
+  not open the door to other third-party calls without a further
+  amendment. Added to the Tech Stack table (§3) as "Observability."
 
-**Version:** 1.1.0 — 2026-09-22
+**Version:** 1.2.0 — 2026-09-23
