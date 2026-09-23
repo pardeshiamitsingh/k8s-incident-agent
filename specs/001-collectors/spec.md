@@ -31,6 +31,11 @@ every later phase guessing at an unstable interface.
   (`OOMKilled`), missing `ConfigMap` reference
   (`CreateContainerConfigError`), and an unschedulable resource request
   (`Pending`).
+- Deployment expansion: when the input `ObjectRef` is a `Deployment`, look
+  up its owned Pods (via owner reference) and collect full evidence for
+  each of them too, alongside the Deployment-level snapshot. Spec 005
+  (incident intake) always resolves to a single object reference and
+  explicitly leaves this expansion to this spec.
 
 **Out (deferred to later specs):**
 - Failure classification (Phase 3).
@@ -40,10 +45,10 @@ every later phase guessing at an unstable interface.
 - Loki log integration (constitution prefers Loki when available, but v1 of
   this spec uses the K8s API's log endpoint directly; Loki fallback logic is
   its own future spec once Loki is actually in the target cluster).
-- Resolving a user's natural-language incident report into a concrete
-  `ObjectRef` (Phase 5 — Incident intake). This spec assumes the caller
-  already has an `ObjectRef` in hand; it is pull-based, one-shot collection,
-  invoked on demand — never continuous or autonomous.
+- Resolving a user's incident report into a concrete `ObjectRef` (Phase 5 —
+  Incident intake, spec 005). This spec assumes the caller already has a
+  single `ObjectRef` in hand (Pod or Deployment); it is pull-based, one-shot
+  collection, invoked on demand — never continuous or autonomous.
 
 ## Constitution check
 
@@ -78,7 +83,13 @@ every later phase guessing at an unstable interface.
   populated only when the container has a prior terminated state).
 - `IncidentEvidence` — `object_ref`, `collected_at`, `events:
   list[K8sEvent]`, `describe: ObjectDescribeSnapshot`, `logs:
-  dict[container_name, LogsSnapshot]`.
+  dict[container_name, LogsSnapshot]`, `pods: list[IncidentEvidence]`
+  (recursive/self-referential — empty for a bare Pod target; populated with
+  one `IncidentEvidence` per owned Pod when `object_ref.kind ==
+  "Deployment"`). Recursive rather than a separate response shape so every
+  downstream consumer (classifier, retriever, diagnoser) handles one type
+  instead of branching on whether it received a Pod-shaped or
+  Deployment-shaped result.
 
 **Module layout** (under a new `collectors/` package):
 - `collectors/models.py` — the pydantic models above.
@@ -89,9 +100,11 @@ every later phase guessing at an unstable interface.
   ObjectDescribeSnapshot`.
 - `collectors/logs.py` — `get_logs(object_ref) -> dict[str, LogsSnapshot]`.
 - `collectors/collect.py` — `collect_evidence(object_ref) ->
-  IncidentEvidence`, composing the three above into one call. This is the
-  only entrypoint later phases (and eventually the LangGraph "collect" node)
-  should import.
+  IncidentEvidence`, composing the three above into one call. When
+  `object_ref.kind == "Deployment"`, it also looks up owned Pods (via owner
+  reference) and calls itself recursively for each to populate `pods`. This
+  is the only entrypoint later phases (and eventually the LangGraph
+  "collect" node) should import.
 
 **Fixtures:** stored under `fixtures/broken-deployments/` as plain YAML
 manifests, one per failure class, applied to the local kind/minikube cluster
@@ -118,6 +131,12 @@ Applied against each fixture in `fixtures/broken-deployments/`:
 - All four: `collect_evidence` completes without raising, returns valid
   JSON-serializable output, and every field the assertions above check is
   non-null/non-empty as specified.
+- Given a `Deployment` `ObjectRef` owning 3 Pods: `collect_evidence` returns
+  `IncidentEvidence.pods` with exactly 3 entries, one per owned Pod, each a
+  fully populated `IncidentEvidence` (own `events`, `describe`, `logs`) with
+  its own `pods` field empty.
+- Given a `Pod` `ObjectRef` (not a Deployment): `IncidentEvidence.pods` is an
+  empty list.
 - Unit tests cover `events.py`, `describe.py`, and `logs.py` individually
   against a mocked K8s API client (no live cluster required for CI).
 - An integration test (marked separately, requires a live kind/minikube
