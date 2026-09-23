@@ -92,8 +92,15 @@ golden incident set before moving on.
   below.)
 - **Phase 6 — Evaluation harness**: Golden set of 15–20 known incidents;
   score root-cause accuracy, remediation quality, latency.
-- **Phase 7 — Interface**: CLI/log output first; web UI (for reviewing
-  diagnoses) is a stretch goal, not required for v1.
+- **Phase 7 — Interface**: an HTTP API is the v1 interface (revised from
+  the original "CLI first" plan — see amendment history), async
+  job-pattern (`POST` to start, poll a status endpoint for the result,
+  since a diagnosis run takes 10-30+ seconds). Network-reachable by
+  design, so it requires real access control (a bearer token, checked on
+  every request) from v1, not deferred. TLS termination is a deployment
+  concern (reverse proxy), not something the API process handles itself.
+  A CLI or web UI on top of this API is a possible future addition, not
+  required for v1.
 
 **Explicitly out of scope for v1** (future roadmap, needs a constitution
 amendment before being built): auto-execution of remediation steps,
@@ -127,5 +134,12 @@ multi-cluster support, non-local/hosted LLM usage, Qdrant migration.
   development; it is the *only* named exception to principle 3 and does
   not open the door to other third-party calls without a further
   amendment. Added to the Tech Stack table (§3) as "Observability."
+- **1.3.0** (2026-09-23): Revised Phase 7 (§4) from "CLI/log output first"
+  to an HTTP API as the v1 interface, async job pattern (diagnosis runs
+  take 10-30+ seconds), with bearer-token access control required from
+  v1 since the API is network-reachable by design — not localhost-only,
+  not deferred. Spec 005's originally-planned CLI entrypoint is
+  superseded by this API; its resolution logic is reused as a library
+  call from the API's request handler instead.
 
-**Version:** 1.2.0 — 2026-09-23
+**Version:** 1.3.0 — 2026-09-23

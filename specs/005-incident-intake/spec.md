@@ -1,7 +1,7 @@
 # Spec: Incident intake
 
 **Status:** draft
-**Constitution version this spec complies with:** 1.1.0
+**Constitution version this spec complies with:** 1.3.0
 
 ## Problem
 
@@ -29,8 +29,11 @@ when resolution fails or is ambiguous.
 - Error handling: a specific, fail-fast error when nothing matches, and a
   hard error (not a silent pick) when the name ambiguously matches more than
   one unrelated object.
-- A CLI entrypoint: `incident-agent diagnose <namespace>/<name> [--kind
-  Pod|Deployment] [--notes "..."]`.
+- A plain library function, `resolve_intake(request: IntakeRequest) ->
+  ObjectRef | ResolutionError`, transport-agnostic -- constitution v1.3.0
+  made an HTTP API (spec 007) the v1 interface instead of a CLI, so this
+  spec no longer defines its own entrypoint; spec 007's request handler
+  calls this function directly and maps `ResolutionError` to an HTTP 4xx.
 - Placement: intake is the first node in the Phase 3 LangGraph graph
   (collect → classify → retrieve → diagnose → plan), not a separate
   pre-pipeline script — resolution failures short-circuit the graph via
@@ -50,9 +53,9 @@ the "explicitly out of scope for v1" list):**
 
 ## Constitution check
 
-- **Propose-only by default, invoked on demand:** This spec *is* the
-  on-demand entrypoint — the agent only acts when a user runs `diagnose`
-  with a specific object. No watching, no polling.
+- **Propose-only by default, invoked on demand:** This spec's resolution
+  logic only runs when spec 007's HTTP API receives a request naming a
+  specific object. No watching, no polling.
 - **Read-only RBAC:** Resolution only needs `get`/`list` on `pods` and
   `deployments` in the given namespace — no new verbs beyond what spec 001
   already requires.
@@ -109,13 +112,11 @@ resolution_error: str | None
 notes: str | None
 ```
 The graph's next node (Phase 1 collector) only proceeds if
-`resolution_error is None`.
-
-**CLI:**
-- `incident-agent diagnose <namespace>/<name>` — positional shorthand,
-  `kubectl`-style.
-- `--kind Pod|Deployment` — optional, skips the search-order fallback.
-- `--notes "<text>"` — optional, passed through as-is.
+`resolution_error is None`. Spec 007's HTTP handler is what actually
+calls `resolve_intake()` before invoking the graph and maps a
+`resolution_error` to an HTTP 4xx response -- this spec owns only the
+resolution logic and its state-field contract, not the request/response
+shape at the API boundary.
 
 ## Acceptance criteria
 
@@ -135,14 +136,12 @@ The graph's next node (Phase 1 collector) only proceeds if
 - Given a namespace containing both a Pod and a Deployment named `W`, both
   healthy or both unhealthy: resolving `W` with no `--kind` returns a
   `resolution_error` stating the name is ambiguous and `--kind` is required.
-- `--kind Deployment` on a name that only exists as a Pod returns a
+- `kind="Deployment"` on a name that only exists as a Pod returns a
   `resolution_error`, not a fallback match — explicit `kind` skips the
   both-kinds lookup and health tie-break entirely, per algorithm step 1.
-- `--notes` text is present, verbatim, in the graph state consumed by the
-  diagnoser node (verified via a stub/mock diagnoser in tests, since
-  Phase 3's real diagnoser doesn't exist yet).
-- CLI positional parsing rejects input that isn't `namespace/name` shaped
-  with a clear usage error (not a stack trace).
+- `notes` text is present, verbatim, in the graph state consumed by the
+  diagnoser node (verified directly against spec 003's real Diagnose node,
+  which now exists).
 
 ## Open questions
 
