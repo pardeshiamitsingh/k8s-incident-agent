@@ -147,13 +147,14 @@ OOMKilled runbook" as an undifferentiated blob.
   resolution failures, node pressure/eviction, stuck `Terminating` pods,
   `ErrImageNeverPull`, insufficient RBAC for the *application's* own
   ServiceAccount (not the agent's).
-- **Re-ingestion semantics:** re-running `ingest_runbooks()` after editing
-  a runbook -- upsert by a deterministic chunk ID (derived from
-  `source_file` + `section`) so stale chunks don't accumulate, or wipe and
-  rebuild the whole collection each run? Leaning upsert-by-deterministic-ID,
-  but a bug here would silently degrade retrieval quality over time
-  without erroring, so worth confirming explicitly.
-- **Chroma persistence path:** where the collection lives on disk and how
-  it's created/managed -- same open question spec 001 left for fixture
-  application (script vs. documented manual step), applies here for the
-  `.chroma/` directory too.
+- ~~**Re-ingestion semantics**~~ -- **Resolved:** deterministic chunk ID
+  (`source_file` + slugified section), delete-then-add per source file on
+  every `ingest_runbooks()` run -- fetches existing chunk IDs for that file
+  via the vector store's `get(where={"source_file": ...})`, deletes them,
+  then re-adds the freshly parsed chunks. Handles edits, renamed sections,
+  and removed sections without leaving stale chunks behind.
+- ~~**Chroma persistence path**~~ -- **Resolved:** `.chroma/` at the repo
+  root by default (gitignored), overridable via the
+  `INCIDENT_AGENT_CHROMA_PATH` env var. Created automatically on first
+  `ingest_runbooks()` run -- no manual step needed, unlike spec 001's
+  fixtures (which apply against a live cluster, not a local directory).
