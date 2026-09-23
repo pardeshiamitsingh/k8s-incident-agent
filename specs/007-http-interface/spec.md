@@ -155,8 +155,9 @@ response either way, since v1 has no persistence to distinguish them).
 
 - `POST /diagnose` without a valid bearer token returns `401` before any
   other processing (resolution, job creation) happens.
-- `POST /diagnose` with a body missing `namespace` or `name` returns `400`
-  with a field-level validation error (FastAPI's default behavior),
+- `POST /diagnose` with a body missing `namespace` or `name` returns `422`
+  with a field-level validation error (FastAPI/pydantic's actual default
+  for request validation, not `400` -- corrected during implementation),
   before `resolve_intake()` is ever called.
 - `POST /diagnose` naming an object that doesn't exist returns `404`
   synchronously (same request, no `job_id`), matching spec 005's
