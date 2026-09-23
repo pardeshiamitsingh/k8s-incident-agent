@@ -5,6 +5,8 @@ runtime containers of its own -- its `container_statuses` is always empty;
 per-Pod container state is what `IncidentEvidence.pods` carries.
 """
 
+import logging
+
 from .k8s_client import build_api_client, build_apps_api_client
 from .models import (
     ContainerState,
@@ -15,8 +17,13 @@ from .models import (
     OwnerReference,
 )
 
+logger = logging.getLogger(__name__)
+
 
 def get_describe(object_ref: ObjectRef) -> ObjectDescribeSnapshot:
+    logger.debug(
+        "describing %s %s/%s", object_ref.kind, object_ref.namespace, object_ref.name
+    )
     if object_ref.kind == "Pod":
         return _describe_pod(object_ref)
     return _describe_deployment(object_ref)
@@ -45,8 +52,14 @@ def _describe_pod(object_ref: ObjectRef) -> ObjectDescribeSnapshot:
         for cs in (pod.status.container_statuses or [])
     ]
 
+    phase = pod.status.phase or "Unknown"
+    logger.debug(
+        "pod %s/%s phase=%s container_states=%s",
+        object_ref.namespace, object_ref.name, phase,
+        {cs.name: cs.state.phase for cs in container_statuses},
+    )
     return ObjectDescribeSnapshot(
-        phase=pod.status.phase or "Unknown",
+        phase=phase,
         conditions=_extract_conditions(pod.status.conditions),
         container_statuses=container_statuses,
         owner_references=_extract_owner_references(pod.metadata.owner_references),
@@ -60,8 +73,12 @@ def _describe_deployment(object_ref: ObjectRef) -> ObjectDescribeSnapshot:
     )
 
     conditions = _extract_conditions(deployment.status.conditions)
+    phase = _deployment_phase(conditions)
+    logger.debug(
+        "deployment %s/%s phase=%s", object_ref.namespace, object_ref.name, phase
+    )
     return ObjectDescribeSnapshot(
-        phase=_deployment_phase(conditions),
+        phase=phase,
         conditions=conditions,
         container_statuses=[],
         owner_references=_extract_owner_references(

@@ -1,7 +1,11 @@
 """Recent event collection for a single object (spec 001)."""
 
+import logging
+
 from .k8s_client import build_api_client
 from .models import K8sEvent, ObjectRef
+
+logger = logging.getLogger(__name__)
 
 
 def get_events(object_ref: ObjectRef) -> list[K8sEvent]:
@@ -12,6 +16,10 @@ def get_events(object_ref: ObjectRef) -> list[K8sEvent]:
     )
     events = api.list_namespaced_event(
         object_ref.namespace, field_selector=field_selector
+    )
+    logger.debug(
+        "found %d event(s) for %s/%s (%s)",
+        len(events.items), object_ref.namespace, object_ref.name, object_ref.kind,
     )
     return [
         K8sEvent(

@@ -1,5 +1,6 @@
 """The single entrypoint later phases should import (spec 001)."""
 
+import logging
 from datetime import datetime, timezone
 
 from .describe import get_describe
@@ -8,8 +9,14 @@ from .k8s_client import build_api_client, build_apps_api_client
 from .logs import get_logs
 from .models import IncidentEvidence, ObjectRef
 
+logger = logging.getLogger(__name__)
+
 
 def collect_evidence(object_ref: ObjectRef) -> IncidentEvidence:
+    logger.info(
+        "collecting evidence for %s %s/%s",
+        object_ref.kind, object_ref.namespace, object_ref.name,
+    )
     events = get_events(object_ref)
     describe = get_describe(object_ref)
 
@@ -18,10 +25,13 @@ def collect_evidence(object_ref: ObjectRef) -> IncidentEvidence:
         pods: list[IncidentEvidence] = []
     else:
         logs = {}
-        pods = [
-            collect_evidence(pod_ref)
-            for pod_ref in _get_owned_pod_refs(object_ref)
-        ]
+        owned_pod_refs = _get_owned_pod_refs(object_ref)
+        logger.info(
+            "deployment %s/%s owns %d pod(s): %s",
+            object_ref.namespace, object_ref.name, len(owned_pod_refs),
+            [ref.name for ref in owned_pod_refs],
+        )
+        pods = [collect_evidence(pod_ref) for pod_ref in owned_pod_refs]
 
     return IncidentEvidence(
         object_ref=object_ref,
@@ -51,6 +61,10 @@ def _get_owned_pod_refs(deployment_ref: ObjectRef) -> list[ObjectRef]:
             ref.uid == deployment_uid for ref in (rs.metadata.owner_references or [])
         )
     }
+    logger.debug(
+        "deployment %s/%s owns %d replicaset(s)",
+        deployment_ref.namespace, deployment_ref.name, len(owned_rs_uids),
+    )
 
     pods = core_api.list_namespaced_pod(deployment_ref.namespace)
     return [
