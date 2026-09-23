@@ -1,0 +1,22 @@
+# Expected symptom: container state.waiting.reason == "ImagePullBackOff"
+# (via "ErrImagePull" first), event reason "Failed"/"ErrImagePull".
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: image-pull-backoff
+  labels:
+    app: image-pull-backoff
+    incident-agent-fixture: "true"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: image-pull-backoff
+  template:
+    metadata:
+      labels:
+        app: image-pull-backoff
+    spec:
+      containers:
+        - name: app
+          image: this-registry-does-not-exist.invalid/broken-image:v1

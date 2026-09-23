@@ -1,0 +1,29 @@
+# Expected symptom: container state.terminated.reason == "OOMKilled",
+# logs.previous non-empty (last output before the kill).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: oom-killed
+  labels:
+    app: oom-killed
+    incident-agent-fixture: "true"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: oom-killed
+  template:
+    metadata:
+      labels:
+        app: oom-killed
+    spec:
+      containers:
+        - name: app
+          image: polinux/stress
+          command: ["stress"]
+          args: ["--vm", "1", "--vm-bytes", "200M", "--vm-hang", "1"]
+          resources:
+            requests:
+              memory: "50Mi"
+            limits:
+              memory: "50Mi"

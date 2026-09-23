@@ -1,0 +1,27 @@
+# Expected symptom: event reason references the missing ConfigMap by name,
+# container never reaches "running" (CreateContainerConfigError).
+# Deliberately does NOT create the referenced ConfigMap -- that's the bug.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: create-container-config-error
+  labels:
+    app: create-container-config-error
+    incident-agent-fixture: "true"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: create-container-config-error
+  template:
+    metadata:
+      labels:
+        app: create-container-config-error
+    spec:
+      containers:
+        - name: app
+          image: busybox:1.36
+          command: ["sh", "-c", "sleep 3600"]
+          envFrom:
+            - configMapRef:
+                name: missing-configmap
