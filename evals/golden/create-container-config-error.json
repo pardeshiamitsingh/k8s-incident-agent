@@ -1,0 +1,157 @@
+{
+  "id": "create-container-config-error",
+  "evidence": {
+    "object_ref": {
+      "kind": "Deployment",
+      "namespace": "evals-golden",
+      "name": "create-container-config-error"
+    },
+    "collected_at": "2026-09-23T20:24:47.020905Z",
+    "events": [
+      {
+        "reason": "ScalingReplicaSet",
+        "message": "Scaled up replica set create-container-config-error-76765b6455 from 0 to 1",
+        "type": "Normal",
+        "count": 1,
+        "first_seen": "2026-09-23T20:24:22Z",
+        "last_seen": "2026-09-23T20:24:22Z",
+        "source_component": "deployment-controller"
+      }
+    ],
+    "describe": {
+      "phase": "Progressing",
+      "conditions": [
+        {
+          "type": "Available",
+          "status": "False",
+          "reason": "MinimumReplicasUnavailable",
+          "message": "Deployment does not have minimum availability."
+        },
+        {
+          "type": "Progressing",
+          "status": "True",
+          "reason": "ReplicaSetUpdated",
+          "message": "ReplicaSet \"create-container-config-error-76765b6455\" is progressing."
+        }
+      ],
+      "container_statuses": [],
+      "owner_references": []
+    },
+    "logs": {},
+    "pods": [
+      {
+        "object_ref": {
+          "kind": "Pod",
+          "namespace": "evals-golden",
+          "name": "create-container-config-error-76765b6455-cvcvx"
+        },
+        "collected_at": "2026-09-23T20:24:47.020897Z",
+        "events": [
+          {
+            "reason": "Scheduled",
+            "message": "Successfully assigned evals-golden/create-container-config-error-76765b6455-cvcvx to k8s-incident-agent-control-plane",
+            "type": "Normal",
+            "count": 1,
+            "first_seen": "2026-09-23T20:24:22Z",
+            "last_seen": "2026-09-23T20:24:22Z",
+            "source_component": "default-scheduler"
+          },
+          {
+            "reason": "Pulled",
+            "message": "Container image \"busybox:1.36\" already present on machine and can be accessed by the pod",
+            "type": "Normal",
+            "count": 3,
+            "first_seen": "2026-09-23T20:24:22Z",
+            "last_seen": "2026-09-23T20:24:33Z",
+            "source_component": "kubelet"
+          },
+          {
+            "reason": "Failed",
+            "message": "Error: configmap \"missing-configmap\" not found",
+            "type": "Warning",
+            "count": 3,
+            "first_seen": "2026-09-23T20:24:22Z",
+            "last_seen": "2026-09-23T20:24:33Z",
+            "source_component": "kubelet"
+          }
+        ],
+        "describe": {
+          "phase": "Pending",
+          "conditions": [
+            {
+              "type": "PodReadyToStartContainers",
+              "status": "True",
+              "reason": null,
+              "message": null
+            },
+            {
+              "type": "Initialized",
+              "status": "True",
+              "reason": null,
+              "message": null
+            },
+            {
+              "type": "Ready",
+              "status": "False",
+              "reason": "ContainersNotReady",
+              "message": "containers with unready status: [app]"
+            },
+            {
+              "type": "ContainersReady",
+              "status": "False",
+              "reason": "ContainersNotReady",
+              "message": "containers with unready status: [app]"
+            },
+            {
+              "type": "PodScheduled",
+              "status": "True",
+              "reason": null,
+              "message": null
+            }
+          ],
+          "container_statuses": [
+            {
+              "name": "app",
+              "state": {
+                "phase": "waiting",
+                "reason": "CreateContainerConfigError",
+                "message": "configmap \"missing-configmap\" not found"
+              },
+              "restart_count": 0,
+              "image": "busybox:1.36",
+              "resource_requests": {},
+              "resource_limits": {}
+            }
+          ],
+          "owner_references": [
+            {
+              "kind": "ReplicaSet",
+              "name": "create-container-config-error-76765b6455",
+              "uid": "2aa96dac-ed65-4eff-901f-8b39649e82a7",
+              "controller": true
+            }
+          ]
+        },
+        "logs": {
+          "app": {
+            "current": null,
+            "previous": null
+          }
+        },
+        "pods": []
+      }
+    ]
+  },
+  "expected_failure_classes": [
+    "CreateContainerConfigError"
+  ],
+  "root_cause_keywords": [
+    "configmap",
+    "missing",
+    "config"
+  ],
+  "remediation_keywords": [
+    "configmap",
+    "create"
+  ]
+}

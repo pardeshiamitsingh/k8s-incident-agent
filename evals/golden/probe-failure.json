@@ -1,0 +1,56 @@
+{
+  "id": "probe-failure",
+  "evidence": {
+    "object_ref": {
+      "kind": "Pod",
+      "namespace": "ns",
+      "name": "probe-failure-def45"
+    },
+    "collected_at": "2026-01-01T12:00:00Z",
+    "events": [
+      {
+        "reason": "Unhealthy",
+        "message": "Readiness probe failed: HTTP probe failed with statuscode: 503",
+        "type": "Warning",
+        "count": 1,
+        "first_seen": "2026-01-01T12:00:00Z",
+        "last_seen": "2026-01-01T12:00:00Z",
+        "source_component": "kubelet"
+      }
+    ],
+    "describe": {
+      "phase": "Running",
+      "conditions": [],
+      "container_statuses": [
+        {
+          "name": "app",
+          "state": {
+            "phase": "running",
+            "reason": null,
+            "message": null
+          },
+          "restart_count": 0,
+          "image": "myapp:v2",
+          "resource_requests": {},
+          "resource_limits": {}
+        }
+      ],
+      "owner_references": []
+    },
+    "logs": {},
+    "pods": []
+  },
+  "expected_failure_classes": [
+    "ProbeFailure"
+  ],
+  "root_cause_keywords": [
+    "probe",
+    "readiness",
+    "health"
+  ],
+  "remediation_keywords": [
+    "probe",
+    "initialdelay",
+    "endpoint"
+  ]
+}

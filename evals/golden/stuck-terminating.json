@@ -1,0 +1,65 @@
+{
+  "id": "stuck-terminating",
+  "evidence": {
+    "object_ref": {
+      "kind": "Pod",
+      "namespace": "ns",
+      "name": "stuck-terminating-stu"
+    },
+    "collected_at": "2026-01-01T12:00:00Z",
+    "events": [
+      {
+        "reason": "Killing",
+        "message": "Stopping container app",
+        "type": "Normal",
+        "count": 1,
+        "first_seen": "2026-01-01T12:00:00Z",
+        "last_seen": "2026-01-01T12:00:00Z",
+        "source_component": "kubelet"
+      },
+      {
+        "reason": "FailedKillPod",
+        "message": "error killing pod: failed to \"KillContainer\" for \"app\" with KillContainerError: rpc error: context deadline exceeded",
+        "type": "Warning",
+        "count": 1,
+        "first_seen": "2026-01-01T12:00:00Z",
+        "last_seen": "2026-01-01T12:00:00Z",
+        "source_component": "kubelet"
+      }
+    ],
+    "describe": {
+      "phase": "Running",
+      "conditions": [],
+      "container_statuses": [
+        {
+          "name": "app",
+          "state": {
+            "phase": "running",
+            "reason": null,
+            "message": null
+          },
+          "restart_count": 0,
+          "image": "myapp:v1",
+          "resource_requests": {},
+          "resource_limits": {}
+        }
+      ],
+      "owner_references": []
+    },
+    "logs": {},
+    "pods": []
+  },
+  "expected_failure_classes": [
+    "Unknown"
+  ],
+  "root_cause_keywords": [
+    "terminat",
+    "finaliz",
+    "stuck"
+  ],
+  "remediation_keywords": [
+    "finalizer",
+    "grace period",
+    "sigterm"
+  ]
+}

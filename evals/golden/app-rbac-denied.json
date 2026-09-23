@@ -1,0 +1,51 @@
+{
+  "id": "app-rbac-denied",
+  "evidence": {
+    "object_ref": {
+      "kind": "Pod",
+      "namespace": "ns",
+      "name": "app-rbac-denied-pqr"
+    },
+    "collected_at": "2026-01-01T12:00:00Z",
+    "events": [],
+    "describe": {
+      "phase": "Running",
+      "conditions": [],
+      "container_statuses": [
+        {
+          "name": "app",
+          "state": {
+            "phase": "running",
+            "reason": null,
+            "message": null
+          },
+          "restart_count": 0,
+          "image": "myoperator:v1",
+          "resource_requests": {},
+          "resource_limits": {}
+        }
+      ],
+      "owner_references": []
+    },
+    "logs": {
+      "app": {
+        "current": "E0101 12:00:00 1 reflector.go:138] Failed to list *v1.Pod: pods is forbidden: User \"system:serviceaccount:ns:myoperator\" cannot list resource \"pods\" in API group \"\" in the namespace \"ns\"",
+        "previous": null
+      }
+    },
+    "pods": []
+  },
+  "expected_failure_classes": [
+    "Unknown"
+  ],
+  "root_cause_keywords": [
+    "forbidden",
+    "rbac",
+    "permission"
+  ],
+  "remediation_keywords": [
+    "role",
+    "rolebinding",
+    "serviceaccount"
+  ]
+}

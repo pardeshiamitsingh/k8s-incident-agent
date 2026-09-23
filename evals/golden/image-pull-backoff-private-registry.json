@@ -1,0 +1,66 @@
+{
+  "id": "image-pull-backoff-private-registry",
+  "evidence": {
+    "object_ref": {
+      "kind": "Pod",
+      "namespace": "ns",
+      "name": "image-pull-backoff-private-vwx"
+    },
+    "collected_at": "2026-01-01T12:00:00Z",
+    "events": [
+      {
+        "reason": "Failed",
+        "message": "Failed to pull image \"registry.internal/team/app:v9\": rpc error: code = Unknown desc = failed to authorize: 401 Unauthorized",
+        "type": "Warning",
+        "count": 1,
+        "first_seen": "2026-01-01T12:00:00Z",
+        "last_seen": "2026-01-01T12:00:00Z",
+        "source_component": "kubelet"
+      },
+      {
+        "reason": "Failed",
+        "message": "Error: ErrImagePull",
+        "type": "Warning",
+        "count": 1,
+        "first_seen": "2026-01-01T12:00:00Z",
+        "last_seen": "2026-01-01T12:00:00Z",
+        "source_component": "kubelet"
+      }
+    ],
+    "describe": {
+      "phase": "Pending",
+      "conditions": [],
+      "container_statuses": [
+        {
+          "name": "app",
+          "state": {
+            "phase": "waiting",
+            "reason": "ImagePullBackOff",
+            "message": null
+          },
+          "restart_count": 0,
+          "image": "registry.internal/team/app:v9",
+          "resource_requests": {},
+          "resource_limits": {}
+        }
+      ],
+      "owner_references": []
+    },
+    "logs": {},
+    "pods": []
+  },
+  "expected_failure_classes": [
+    "ImagePullBackOff"
+  ],
+  "root_cause_keywords": [
+    "image",
+    "pull",
+    "unauthorized",
+    "credential"
+  ],
+  "remediation_keywords": [
+    "imagepullsecret",
+    "credential",
+    "registry"
+  ]
+}

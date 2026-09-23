@@ -1,0 +1,186 @@
+{
+  "id": "image-pull-backoff",
+  "evidence": {
+    "object_ref": {
+      "kind": "Deployment",
+      "namespace": "evals-golden",
+      "name": "image-pull-backoff"
+    },
+    "collected_at": "2026-09-23T20:24:46.363775Z",
+    "events": [
+      {
+        "reason": "ScalingReplicaSet",
+        "message": "Scaled up replica set image-pull-backoff-cc78f657 from 0 to 1",
+        "type": "Normal",
+        "count": 1,
+        "first_seen": "2026-09-23T20:24:22Z",
+        "last_seen": "2026-09-23T20:24:22Z",
+        "source_component": "deployment-controller"
+      }
+    ],
+    "describe": {
+      "phase": "Progressing",
+      "conditions": [
+        {
+          "type": "Available",
+          "status": "False",
+          "reason": "MinimumReplicasUnavailable",
+          "message": "Deployment does not have minimum availability."
+        },
+        {
+          "type": "Progressing",
+          "status": "True",
+          "reason": "ReplicaSetUpdated",
+          "message": "ReplicaSet \"image-pull-backoff-cc78f657\" is progressing."
+        }
+      ],
+      "container_statuses": [],
+      "owner_references": []
+    },
+    "logs": {},
+    "pods": [
+      {
+        "object_ref": {
+          "kind": "Pod",
+          "namespace": "evals-golden",
+          "name": "image-pull-backoff-cc78f657-87lk5"
+        },
+        "collected_at": "2026-09-23T20:24:46.363765Z",
+        "events": [
+          {
+            "reason": "Scheduled",
+            "message": "Successfully assigned evals-golden/image-pull-backoff-cc78f657-87lk5 to k8s-incident-agent-control-plane",
+            "type": "Normal",
+            "count": 1,
+            "first_seen": "2026-09-23T20:24:22Z",
+            "last_seen": "2026-09-23T20:24:22Z",
+            "source_component": "default-scheduler"
+          },
+          {
+            "reason": "Pulling",
+            "message": "Pulling image \"this-registry-does-not-exist.invalid/broken-image:v1\"",
+            "type": "Normal",
+            "count": 2,
+            "first_seen": "2026-09-23T20:24:22Z",
+            "last_seen": "2026-09-23T20:24:37Z",
+            "source_component": "kubelet"
+          },
+          {
+            "reason": "Failed",
+            "message": "Failed to pull image \"this-registry-does-not-exist.invalid/broken-image:v1\": failed to pull and unpack image \"this-registry-does-not-exist.invalid/broken-image:v1\": failed to resolve reference \"this-registry-does-not-exist.invalid/broken-image:v1\": failed to do request: Head \"https://this-registry-does-not-exist.invalid/v2/broken-image/manifests/v1\": dial tcp: lookup this-registry-does-not-exist.invalid on 192.168.65.254:53: no such host",
+            "type": "Warning",
+            "count": 2,
+            "first_seen": "2026-09-23T20:24:22Z",
+            "last_seen": "2026-09-23T20:24:37Z",
+            "source_component": "kubelet"
+          },
+          {
+            "reason": "Failed",
+            "message": "Error: ErrImagePull",
+            "type": "Warning",
+            "count": 2,
+            "first_seen": "2026-09-23T20:24:22Z",
+            "last_seen": "2026-09-23T20:24:37Z",
+            "source_component": "kubelet"
+          },
+          {
+            "reason": "BackOff",
+            "message": "Back-off pulling image \"this-registry-does-not-exist.invalid/broken-image:v1\"",
+            "type": "Normal",
+            "count": 1,
+            "first_seen": "2026-09-23T20:24:22Z",
+            "last_seen": "2026-09-23T20:24:22Z",
+            "source_component": "kubelet"
+          },
+          {
+            "reason": "Failed",
+            "message": "Error: ImagePullBackOff",
+            "type": "Warning",
+            "count": 1,
+            "first_seen": "2026-09-23T20:24:22Z",
+            "last_seen": "2026-09-23T20:24:22Z",
+            "source_component": "kubelet"
+          }
+        ],
+        "describe": {
+          "phase": "Pending",
+          "conditions": [
+            {
+              "type": "PodReadyToStartContainers",
+              "status": "True",
+              "reason": null,
+              "message": null
+            },
+            {
+              "type": "Initialized",
+              "status": "True",
+              "reason": null,
+              "message": null
+            },
+            {
+              "type": "Ready",
+              "status": "False",
+              "reason": "ContainersNotReady",
+              "message": "containers with unready status: [app]"
+            },
+            {
+              "type": "ContainersReady",
+              "status": "False",
+              "reason": "ContainersNotReady",
+              "message": "containers with unready status: [app]"
+            },
+            {
+              "type": "PodScheduled",
+              "status": "True",
+              "reason": null,
+              "message": null
+            }
+          ],
+          "container_statuses": [
+            {
+              "name": "app",
+              "state": {
+                "phase": "waiting",
+                "reason": "ImagePullBackOff",
+                "message": "Back-off pulling image \"this-registry-does-not-exist.invalid/broken-image:v1\": ErrImagePull: failed to pull and unpack image \"this-registry-does-not-exist.invalid/broken-image:v1\": failed to resolve reference \"this-registry-does-not-exist.invalid/broken-image:v1\": failed to do request: Head \"https://this-registry-does-not-exist.invalid/v2/broken-image/manifests/v1\": dial tcp: lookup this-registry-does-not-exist.invalid on 192.168.65.254:53: no such host"
+              },
+              "restart_count": 0,
+              "image": "this-registry-does-not-exist.invalid/broken-image:v1",
+              "resource_requests": {},
+              "resource_limits": {}
+            }
+          ],
+          "owner_references": [
+            {
+              "kind": "ReplicaSet",
+              "name": "image-pull-backoff-cc78f657",
+              "uid": "d0c3e761-6dd2-4242-a8a9-290626cd831e",
+              "controller": true
+            }
+          ]
+        },
+        "logs": {
+          "app": {
+            "current": null,
+            "previous": null
+          }
+        },
+        "pods": []
+      }
+    ]
+  },
+  "expected_failure_classes": [
+    "ImagePullBackOff"
+  ],
+  "root_cause_keywords": [
+    "image",
+    "pull",
+    "backoff",
+    "registry"
+  ],
+  "remediation_keywords": [
+    "image",
+    "tag",
+    "registry"
+  ]
+}

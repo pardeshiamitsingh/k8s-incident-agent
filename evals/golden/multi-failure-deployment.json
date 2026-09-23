@@ -1,0 +1,103 @@
+{
+  "id": "multi-failure-deployment",
+  "evidence": {
+    "object_ref": {
+      "kind": "Deployment",
+      "namespace": "ns",
+      "name": "multi-failure"
+    },
+    "collected_at": "2026-01-01T12:00:00Z",
+    "events": [],
+    "describe": {
+      "phase": "Progressing",
+      "conditions": [],
+      "container_statuses": [],
+      "owner_references": []
+    },
+    "logs": {},
+    "pods": [
+      {
+        "object_ref": {
+          "kind": "Pod",
+          "namespace": "ns",
+          "name": "multi-failure-abc"
+        },
+        "collected_at": "2026-01-01T12:00:00Z",
+        "events": [],
+        "describe": {
+          "phase": "Running",
+          "conditions": [],
+          "container_statuses": [
+            {
+              "name": "app",
+              "state": {
+                "phase": "terminated",
+                "reason": "OOMKilled",
+                "message": null
+              },
+              "restart_count": 2,
+              "image": "myapp:v1",
+              "resource_requests": {},
+              "resource_limits": {}
+            }
+          ],
+          "owner_references": []
+        },
+        "logs": {},
+        "pods": []
+      },
+      {
+        "object_ref": {
+          "kind": "Pod",
+          "namespace": "ns",
+          "name": "multi-failure-def"
+        },
+        "collected_at": "2026-01-01T12:00:00Z",
+        "events": [
+          {
+            "reason": "Failed",
+            "message": "Failed to pull image \"myapp:v1\": not found",
+            "type": "Warning",
+            "count": 1,
+            "first_seen": "2026-01-01T12:00:00Z",
+            "last_seen": "2026-01-01T12:00:00Z",
+            "source_component": "kubelet"
+          }
+        ],
+        "describe": {
+          "phase": "Pending",
+          "conditions": [],
+          "container_statuses": [
+            {
+              "name": "app",
+              "state": {
+                "phase": "waiting",
+                "reason": "ImagePullBackOff",
+                "message": null
+              },
+              "restart_count": 0,
+              "image": "myapp:v1",
+              "resource_requests": {},
+              "resource_limits": {}
+            }
+          ],
+          "owner_references": []
+        },
+        "logs": {},
+        "pods": []
+      }
+    ]
+  },
+  "expected_failure_classes": [
+    "ImagePullBackOff",
+    "OOMKilled"
+  ],
+  "root_cause_keywords": [
+    "memory",
+    "image"
+  ],
+  "remediation_keywords": [
+    "memory",
+    "image"
+  ]
+}

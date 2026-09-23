@@ -1,0 +1,65 @@
+{
+  "id": "oom-killed-memory-leak",
+  "evidence": {
+    "object_ref": {
+      "kind": "Pod",
+      "namespace": "ns",
+      "name": "oom-killed-leak-yz1"
+    },
+    "collected_at": "2026-01-01T12:00:00Z",
+    "events": [
+      {
+        "reason": "Killing",
+        "message": "Stopping container app",
+        "type": "Normal",
+        "count": 1,
+        "first_seen": "2026-01-01T12:00:00Z",
+        "last_seen": "2026-01-01T12:00:00Z",
+        "source_component": "kubelet"
+      }
+    ],
+    "describe": {
+      "phase": "Running",
+      "conditions": [],
+      "container_statuses": [
+        {
+          "name": "app",
+          "state": {
+            "phase": "terminated",
+            "reason": "OOMKilled",
+            "message": null
+          },
+          "restart_count": 9,
+          "image": "myapp:v4",
+          "resource_requests": {
+            "memory": "256Mi"
+          },
+          "resource_limits": {
+            "memory": "256Mi"
+          }
+        }
+      ],
+      "owner_references": []
+    },
+    "logs": {
+      "app": {
+        "current": null,
+        "previous": "[12:00:00] heap: 180Mi\n[12:05:00] heap: 210Mi\n[12:10:00] heap: 250Mi\nOOM"
+      }
+    },
+    "pods": []
+  },
+  "expected_failure_classes": [
+    "OOMKilled"
+  ],
+  "root_cause_keywords": [
+    "memory",
+    "leak",
+    "oom"
+  ],
+  "remediation_keywords": [
+    "leak",
+    "application-level",
+    "fix"
+  ]
+}

@@ -1,0 +1,55 @@
+{
+  "id": "node-pressure-eviction",
+  "evidence": {
+    "object_ref": {
+      "kind": "Pod",
+      "namespace": "ns",
+      "name": "node-pressure-eviction-ghi"
+    },
+    "collected_at": "2026-01-01T12:00:00Z",
+    "events": [
+      {
+        "reason": "Evicted",
+        "message": "The node was low on resource: memory. Container app was using 512Mi, which exceeds its request of 128Mi.",
+        "type": "Warning",
+        "count": 1,
+        "first_seen": "2026-01-01T12:00:00Z",
+        "last_seen": "2026-01-01T12:00:00Z",
+        "source_component": "kubelet"
+      }
+    ],
+    "describe": {
+      "phase": "Failed",
+      "conditions": [],
+      "container_statuses": [
+        {
+          "name": "app",
+          "state": {
+            "phase": "terminated",
+            "reason": "Error",
+            "message": null
+          },
+          "restart_count": 0,
+          "image": "myapp:v1",
+          "resource_requests": {},
+          "resource_limits": {}
+        }
+      ],
+      "owner_references": []
+    },
+    "logs": {},
+    "pods": []
+  },
+  "expected_failure_classes": [
+    "NodePressureEviction"
+  ],
+  "root_cause_keywords": [
+    "evict",
+    "node",
+    "pressure"
+  ],
+  "remediation_keywords": [
+    "resources.requests",
+    "capacity"
+  ]
+}

@@ -1,0 +1,61 @@
+{
+  "id": "crash-loop-backoff",
+  "evidence": {
+    "object_ref": {
+      "kind": "Pod",
+      "namespace": "ns",
+      "name": "crash-loop-backoff-abc12"
+    },
+    "collected_at": "2026-01-01T12:00:00Z",
+    "events": [
+      {
+        "reason": "BackOff",
+        "message": "Back-off restarting failed container app in pod crash-loop-backoff-abc12",
+        "type": "Warning",
+        "count": 1,
+        "first_seen": "2026-01-01T12:00:00Z",
+        "last_seen": "2026-01-01T12:00:00Z",
+        "source_component": "kubelet"
+      }
+    ],
+    "describe": {
+      "phase": "Running",
+      "conditions": [],
+      "container_statuses": [
+        {
+          "name": "app",
+          "state": {
+            "phase": "waiting",
+            "reason": "CrashLoopBackOff",
+            "message": "back-off 40s restarting failed container=app"
+          },
+          "restart_count": 6,
+          "image": "myapp:v3",
+          "resource_requests": {},
+          "resource_limits": {}
+        }
+      ],
+      "owner_references": []
+    },
+    "logs": {
+      "app": {
+        "current": null,
+        "previous": "panic: unhandled exception at startup\nExiting with code 1"
+      }
+    },
+    "pods": []
+  },
+  "expected_failure_classes": [
+    "CrashLoopBackOff"
+  ],
+  "root_cause_keywords": [
+    "crash",
+    "restart",
+    "exit"
+  ],
+  "remediation_keywords": [
+    "logs.previous",
+    "fix",
+    "application"
+  ]
+}

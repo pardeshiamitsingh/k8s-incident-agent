@@ -1,0 +1,56 @@
+{
+  "id": "err-image-never-pull",
+  "evidence": {
+    "object_ref": {
+      "kind": "Pod",
+      "namespace": "ns",
+      "name": "err-image-never-pull-jkl"
+    },
+    "collected_at": "2026-01-01T12:00:00Z",
+    "events": [
+      {
+        "reason": "ErrImageNeverPull",
+        "message": "Container image \"myapp:local\" is not present with pull policy of Never",
+        "type": "Warning",
+        "count": 1,
+        "first_seen": "2026-01-01T12:00:00Z",
+        "last_seen": "2026-01-01T12:00:00Z",
+        "source_component": "kubelet"
+      }
+    ],
+    "describe": {
+      "phase": "Pending",
+      "conditions": [],
+      "container_statuses": [
+        {
+          "name": "app",
+          "state": {
+            "phase": "waiting",
+            "reason": "ErrImageNeverPull",
+            "message": "Container image \"myapp:local\" is not present with pull policy of Never"
+          },
+          "restart_count": 0,
+          "image": "myapp:local",
+          "resource_requests": {},
+          "resource_limits": {}
+        }
+      ],
+      "owner_references": []
+    },
+    "logs": {},
+    "pods": []
+  },
+  "expected_failure_classes": [
+    "ErrImageNeverPull"
+  ],
+  "root_cause_keywords": [
+    "image",
+    "never",
+    "pull policy"
+  ],
+  "remediation_keywords": [
+    "load",
+    "node",
+    "tag"
+  ]
+}

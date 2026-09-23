@@ -1,0 +1,55 @@
+{
+  "id": "pvc-binding-failure",
+  "evidence": {
+    "object_ref": {
+      "kind": "Pod",
+      "namespace": "ns",
+      "name": "pvc-binding-failure-xyz"
+    },
+    "collected_at": "2026-01-01T12:00:00Z",
+    "events": [
+      {
+        "reason": "FailedMount",
+        "message": "Unable to attach or mount volumes: unmounted volumes=[data], unattached volumes=[data]: timed out waiting for the condition",
+        "type": "Warning",
+        "count": 1,
+        "first_seen": "2026-01-01T12:00:00Z",
+        "last_seen": "2026-01-01T12:00:00Z",
+        "source_component": "kubelet"
+      }
+    ],
+    "describe": {
+      "phase": "Pending",
+      "conditions": [],
+      "container_statuses": [
+        {
+          "name": "app",
+          "state": {
+            "phase": "waiting",
+            "reason": "ContainerCreating",
+            "message": null
+          },
+          "restart_count": 0,
+          "image": "myapp:v1",
+          "resource_requests": {},
+          "resource_limits": {}
+        }
+      ],
+      "owner_references": []
+    },
+    "logs": {},
+    "pods": []
+  },
+  "expected_failure_classes": [
+    "PVCBindingFailure"
+  ],
+  "root_cause_keywords": [
+    "volume",
+    "pvc",
+    "mount"
+  ],
+  "remediation_keywords": [
+    "storageclass",
+    "provision"
+  ]
+}

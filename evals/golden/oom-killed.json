@@ -1,0 +1,207 @@
+{
+  "id": "oom-killed",
+  "evidence": {
+    "object_ref": {
+      "kind": "Deployment",
+      "namespace": "evals-golden",
+      "name": "oom-killed"
+    },
+    "collected_at": "2026-09-23T20:24:45.673395Z",
+    "events": [
+      {
+        "reason": "ScalingReplicaSet",
+        "message": "Scaled up replica set oom-killed-574cff4f45 from 0 to 1",
+        "type": "Normal",
+        "count": 1,
+        "first_seen": "2026-09-23T20:24:22Z",
+        "last_seen": "2026-09-23T20:24:22Z",
+        "source_component": "deployment-controller"
+      }
+    ],
+    "describe": {
+      "phase": "Progressing",
+      "conditions": [
+        {
+          "type": "Progressing",
+          "status": "True",
+          "reason": "NewReplicaSetAvailable",
+          "message": "ReplicaSet \"oom-killed-574cff4f45\" has successfully progressed."
+        },
+        {
+          "type": "Available",
+          "status": "False",
+          "reason": "MinimumReplicasUnavailable",
+          "message": "Deployment does not have minimum availability."
+        }
+      ],
+      "container_statuses": [],
+      "owner_references": []
+    },
+    "logs": {},
+    "pods": [
+      {
+        "object_ref": {
+          "kind": "Pod",
+          "namespace": "evals-golden",
+          "name": "oom-killed-574cff4f45-2l2cs"
+        },
+        "collected_at": "2026-09-23T20:24:45.673384Z",
+        "events": [
+          {
+            "reason": "Scheduled",
+            "message": "Successfully assigned evals-golden/oom-killed-574cff4f45-2l2cs to k8s-incident-agent-control-plane",
+            "type": "Normal",
+            "count": 1,
+            "first_seen": "2026-09-23T20:24:22Z",
+            "last_seen": "2026-09-23T20:24:22Z",
+            "source_component": "default-scheduler"
+          },
+          {
+            "reason": "Pulling",
+            "message": "Pulling image \"polinux/stress\"",
+            "type": "Normal",
+            "count": 3,
+            "first_seen": "2026-09-23T20:24:22Z",
+            "last_seen": "2026-09-23T20:24:35Z",
+            "source_component": "kubelet"
+          },
+          {
+            "reason": "Pulled",
+            "message": "Successfully pulled image \"polinux/stress\" in 443ms (443ms including waiting). Image size: 4041495 bytes.",
+            "type": "Normal",
+            "count": 1,
+            "first_seen": "2026-09-23T20:24:23Z",
+            "last_seen": "2026-09-23T20:24:23Z",
+            "source_component": "kubelet"
+          },
+          {
+            "reason": "Created",
+            "message": "Container created",
+            "type": "Normal",
+            "count": 3,
+            "first_seen": "2026-09-23T20:24:23Z",
+            "last_seen": "2026-09-23T20:24:36Z",
+            "source_component": "kubelet"
+          },
+          {
+            "reason": "Started",
+            "message": "Container started",
+            "type": "Normal",
+            "count": 3,
+            "first_seen": "2026-09-23T20:24:23Z",
+            "last_seen": "2026-09-23T20:24:36Z",
+            "source_component": "kubelet"
+          },
+          {
+            "reason": "Pulled",
+            "message": "Successfully pulled image \"polinux/stress\" in 489ms (489ms including waiting). Image size: 4041495 bytes.",
+            "type": "Normal",
+            "count": 1,
+            "first_seen": "2026-09-23T20:24:24Z",
+            "last_seen": "2026-09-23T20:24:24Z",
+            "source_component": "kubelet"
+          },
+          {
+            "reason": "BackOff",
+            "message": "Back-off restarting failed container app in pod oom-killed-574cff4f45-2l2cs_evals-golden(042a58c8-fdd2-4201-b931-e79126d6ca65)",
+            "type": "Warning",
+            "count": 3,
+            "first_seen": "2026-09-23T20:24:24Z",
+            "last_seen": "2026-09-23T20:24:36Z",
+            "source_component": "kubelet"
+          },
+          {
+            "reason": "Pulled",
+            "message": "Successfully pulled image \"polinux/stress\" in 505ms (505ms including waiting). Image size: 4041495 bytes.",
+            "type": "Normal",
+            "count": 1,
+            "first_seen": "2026-09-23T20:24:36Z",
+            "last_seen": "2026-09-23T20:24:36Z",
+            "source_component": "kubelet"
+          }
+        ],
+        "describe": {
+          "phase": "Running",
+          "conditions": [
+            {
+              "type": "PodReadyToStartContainers",
+              "status": "True",
+              "reason": null,
+              "message": null
+            },
+            {
+              "type": "Initialized",
+              "status": "True",
+              "reason": null,
+              "message": null
+            },
+            {
+              "type": "Ready",
+              "status": "False",
+              "reason": "ContainersNotReady",
+              "message": "containers with unready status: [app]"
+            },
+            {
+              "type": "ContainersReady",
+              "status": "False",
+              "reason": "ContainersNotReady",
+              "message": "containers with unready status: [app]"
+            },
+            {
+              "type": "PodScheduled",
+              "status": "True",
+              "reason": null,
+              "message": null
+            }
+          ],
+          "container_statuses": [
+            {
+              "name": "app",
+              "state": {
+                "phase": "terminated",
+                "reason": "OOMKilled",
+                "message": null
+              },
+              "restart_count": 2,
+              "image": "docker.io/polinux/stress:latest",
+              "resource_requests": {
+                "memory": "50Mi"
+              },
+              "resource_limits": {
+                "memory": "50Mi"
+              }
+            }
+          ],
+          "owner_references": [
+            {
+              "kind": "ReplicaSet",
+              "name": "oom-killed-574cff4f45",
+              "uid": "dfbe6eae-5ed6-4544-9b6c-b720a70fb8ff",
+              "controller": true
+            }
+          ]
+        },
+        "logs": {
+          "app": {
+            "current": "b'stress: info: [1] dispatching hogs: 0 cpu, 0 io, 1 vm, 0 hdd\\n'",
+            "previous": "b'unable to retrieve container logs for containerd://b4d8e8338a1d3b24b0c67ae59d6d98be293cb1a079bc9f51d14764cad7d658b3'"
+          }
+        },
+        "pods": []
+      }
+    ]
+  },
+  "expected_failure_classes": [
+    "OOMKilled"
+  ],
+  "root_cause_keywords": [
+    "memory",
+    "OOM",
+    "limit",
+    "killed"
+  ],
+  "remediation_keywords": [
+    "memory",
+    "limit"
+  ]
+}
