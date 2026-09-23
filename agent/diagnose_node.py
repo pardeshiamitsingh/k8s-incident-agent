@@ -17,9 +17,11 @@ Produce a root cause diagnosis. You MUST cite:
 - cited_evidence: the specific evidence lines (e.g. "Container app: \
 state=terminated reason=OOMKilled") that support your diagnosis, quoted or \
 closely paraphrased from the evidence given.
-- cited_runbook_chunks: the runbook chunk IDs (the bracketed [id] shown \
-before each excerpt, e.g. "oom-killed#diagnosis") that informed your \
-diagnosis.
+- cited_runbook_chunks: the runbook chunk IDs that informed your diagnosis. \
+Each excerpt below is shown prefixed with its ID in square brackets, e.g. \
+"[oom-killed#diagnosis]" -- copy ONLY the ID text itself into \
+cited_runbook_chunks (e.g. "oom-killed#diagnosis"), WITHOUT the surrounding \
+square brackets.
 
 Do not invent evidence or chunk IDs that were not given to you. If the \
 evidence is ambiguous or incomplete, say so in root_cause rather than \
@@ -53,5 +55,16 @@ def diagnose_node(state: AgentState) -> dict:
     diagnosis = structured_llm.invoke(
         [("system", SYSTEM_PROMPT), ("user", user_prompt)]
     )
+    diagnosis.cited_runbook_chunks = [
+        _strip_brackets(chunk_id) for chunk_id in diagnosis.cited_runbook_chunks
+    ]
     logger.info("diagnose: root_cause=%r", diagnosis.root_cause)
     return {"diagnosis": diagnosis}
+
+
+def _strip_brackets(chunk_id: str) -> str:
+    """Defensive normalization: the prompt asks for the bare ID, but
+    nothing guarantees the LLM won't copy the "[id]" formatting used to
+    display each excerpt verbatim -- observed in practice, not
+    hypothetical."""
+    return chunk_id.removeprefix("[").removesuffix("]")

@@ -43,3 +43,26 @@ def test_diagnose_node_requires_evidence():
     ref = ObjectRef(kind="Pod", namespace="ns", name="p")
     with pytest.raises(ValueError):
         diagnose_node(AgentState(resolved_object=ref))
+
+
+@patch("agent.diagnose_node.get_llm")
+def test_diagnose_node_strips_brackets_from_chunk_ids(mock_get_llm):
+    # Observed in practice: the LLM sometimes copies the "[id]" display
+    # formatting from the prompt verbatim instead of the bare ID.
+    llm_output = Diagnosis(
+        root_cause="oom",
+        cited_evidence=["evidence line"],
+        cited_runbook_chunks=["[oom-killed#diagnosis]", "oom-killed#remediation"],
+    )
+    structured_llm = MagicMock()
+    structured_llm.invoke.return_value = llm_output
+    llm = MagicMock()
+    llm.with_structured_output.return_value = structured_llm
+    mock_get_llm.return_value = llm
+
+    result = diagnose_node(_state())
+
+    assert result["diagnosis"].cited_runbook_chunks == [
+        "oom-killed#diagnosis",
+        "oom-killed#remediation",
+    ]
