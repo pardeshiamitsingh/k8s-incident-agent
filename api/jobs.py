@@ -1,17 +1,20 @@
-"""In-memory job store (spec 007).
+"""Redis-backed job store (spec 009, superseding spec 007's in-memory one).
 
-No external queue or database -- matches this project's existing "zero
-extra infra" pattern (embedded Chroma, no server; this, no job broker).
-Jobs are lost on process restart; see spec 007's Open questions.
+Replaces the in-memory dict so job state survives a process restart and
+is shared across multiple API/worker processes -- the whole point of
+this spec. Same public interface (`create_job`, `get_job`) as the
+in-memory version it replaces, so `api/app.py`'s route handlers barely
+change.
 """
 
 import logging
-import threading
+import os
 import uuid
-from dataclasses import dataclass
 from typing import Literal
 
-from agent.graph import run_agent
+import redis
+from pydantic import BaseModel
+
 from agent.models import Diagnosis, RemediationPlan
 from collectors.models import ObjectRef
 from knowledge_base.models import RunbookChunk
@@ -20,9 +23,11 @@ logger = logging.getLogger(__name__)
 
 JobState = Literal["running", "completed", "failed"]
 
+DEFAULT_JOB_TTL_SECONDS = 24 * 60 * 60
+KEY_PREFIX = "incident-agent:job:"
 
-@dataclass
-class Job:
+
+class Job(BaseModel):
     job_id: str
     status: JobState
     resolved_object: ObjectRef
@@ -33,23 +38,30 @@ class Job:
     error: str | None = None
 
 
-class JobStore:
-    """Thread-safe in-memory job store. A single instance (`job_store`
-    below) is shared for the process lifetime."""
+def _redis_url() -> str:
+    return os.environ.get("INCIDENT_AGENT_REDIS_URL", "redis://localhost:6379/0")
 
-    def __init__(self) -> None:
-        self._jobs: dict[str, Job] = {}
-        self._lock = threading.Lock()
+
+def get_redis_connection() -> redis.Redis:
+    return redis.Redis.from_url(_redis_url())
+
+
+class RedisJobStore:
+    """No in-process lock needed -- Redis's own per-key atomicity replaces
+    it; `create_job`/`save` are each a single `SET`."""
+
+    def __init__(self, connection: redis.Redis, ttl_seconds: int = DEFAULT_JOB_TTL_SECONDS):
+        self._redis = connection
+        self._ttl = ttl_seconds
 
     def create_job(self, resolved_object: ObjectRef) -> Job:
         """Creates a new `running` job for an already-resolved object and
         stores it. Does not start the agent graph itself -- see
-        `run_job`."""
+        `api/tasks.py`'s `run_diagnosis_job`, enqueued by the caller."""
         job = Job(
             job_id=str(uuid.uuid4()), status="running", resolved_object=resolved_object
         )
-        with self._lock:
-            self._jobs[job.job_id] = job
+        self.save(job)
         logger.info(
             "created job %s for %s %s/%s",
             job.job_id, resolved_object.kind,
@@ -58,34 +70,13 @@ class JobStore:
         return job
 
     def get_job(self, job_id: str) -> Job | None:
-        with self._lock:
-            return self._jobs.get(job_id)
+        raw = self._redis.get(KEY_PREFIX + job_id)
+        if raw is None:
+            return None
+        return Job.model_validate_json(raw)
 
-    def run_job(
-        self, job_id: str, resolved_object: ObjectRef, notes: str | None
-    ) -> None:
-        """Runs the agent graph and updates the job in place with the
-        result, or with the exception message if it raised. Blocking --
-        the caller (`api/app.py`) is responsible for running this off the
-        event loop, e.g. via `asyncio.to_thread`."""
-        try:
-            result = run_agent(resolved_object, notes=notes)
-        except Exception as exc:
-            logger.exception("job %s failed", job_id)
-            with self._lock:
-                job = self._jobs[job_id]
-                job.status = "failed"
-                job.error = str(exc)
-            return
-
-        logger.info("job %s completed", job_id)
-        with self._lock:
-            job = self._jobs[job_id]
-            job.status = "completed"
-            job.classified_failure_classes = result.classified_failure_classes
-            job.retrieved_chunks = result.retrieved_chunks
-            job.diagnosis = result.diagnosis
-            job.remediation_plan = result.remediation_plan
+    def save(self, job: Job) -> None:
+        self._redis.set(KEY_PREFIX + job.job_id, job.model_dump_json(), ex=self._ttl)
 
 
-job_store = JobStore()
+job_store = RedisJobStore(get_redis_connection())

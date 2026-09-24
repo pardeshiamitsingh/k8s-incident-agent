@@ -29,6 +29,23 @@ def chroma_path() -> Path:
 
 
 def get_vector_store() -> Chroma:
+    """Server mode (spec 009) when `INCIDENT_AGENT_CHROMA_HOST` is set --
+    required once more than one process touches the store concurrently
+    (multiple RQ workers), since an embedded `PersistentClient` isn't safe
+    for that (spec 004's cross-process consistency bug). Falls back to
+    today's embedded single-process mode otherwise, so local dev and the
+    existing test suite are unaffected."""
+    host = os.environ.get("INCIDENT_AGENT_CHROMA_HOST")
+    if host:
+        port = int(os.environ.get("INCIDENT_AGENT_CHROMA_PORT", "8000"))
+        logger.debug("using Chroma server mode at %s:%d", host, port)
+        return Chroma(
+            collection_name=COLLECTION_NAME,
+            embedding_function=get_embeddings(),
+            host=host,
+            port=port,
+        )
+
     return Chroma(
         collection_name=COLLECTION_NAME,
         embedding_function=get_embeddings(),

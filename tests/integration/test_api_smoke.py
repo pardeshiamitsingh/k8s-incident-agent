@@ -1,10 +1,12 @@
-"""Live end-to-end smoke test for the HTTP API (spec 007).
+"""Live end-to-end smoke test for the HTTP API (spec 007, spec 009).
 
-Spins up a real `uvicorn` process (matching how this actually runs) and
-drives it over real HTTP, against a live fixture. Requires a live
-kind/minikube cluster and a local Ollama server -- not run by default:
+Spins up a real `uvicorn` process plus a real `api.worker` process
+(matching how this actually runs since spec 009 -- an enqueued job does
+nothing without a worker consuming the queue) and drives it over real
+HTTP, against a live fixture. Requires a live kind/minikube cluster, a
+local Ollama server, and a local Redis -- not run by default:
 
-    uv run pytest -m "integration and requires_ollama" tests/integration/test_api_smoke.py
+    uv run pytest -m "integration and requires_ollama and requires_redis" tests/integration/test_api_smoke.py
 """
 
 import os
@@ -17,7 +19,7 @@ import pytest
 
 from knowledge_base.ingest import ingest_runbooks
 
-pytestmark = [pytest.mark.integration, pytest.mark.requires_ollama]
+pytestmark = [pytest.mark.integration, pytest.mark.requires_ollama, pytest.mark.requires_redis]
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 FIXTURES_DIR = REPO_ROOT / "fixtures" / "broken-deployments"
@@ -58,7 +60,7 @@ def api_server(tmp_path_factory):
         ingest_runbooks()
 
         env = {**os.environ, "INCIDENT_AGENT_API_TOKEN": API_TOKEN}
-        proc = subprocess.Popen(
+        api_proc = subprocess.Popen(
             [
                 "uv", "run", "uvicorn", "api.app:app",
                 "--port", str(PORT), "--log-level", "warning",
@@ -79,10 +81,23 @@ def api_server(tmp_path_factory):
                 time.sleep(1)
             if not healthy:
                 pytest.fail("API server did not become healthy in time")
-            yield BASE_URL
+
+            # Spec 009: an enqueued job does nothing without a worker
+            # process consuming the queue -- same env (same isolated
+            # Chroma path, same Redis) as the API process.
+            worker_proc = subprocess.Popen(
+                ["uv", "run", "python", "-m", "api.worker"],
+                env=env,
+                cwd=REPO_ROOT,
+            )
+            try:
+                yield BASE_URL
+            finally:
+                worker_proc.terminate()
+                worker_proc.wait(timeout=10)
         finally:
-            proc.terminate()
-            proc.wait(timeout=10)
+            api_proc.terminate()
+            api_proc.wait(timeout=10)
     finally:
         if previous is None:
             os.environ.pop("INCIDENT_AGENT_CHROMA_PATH", None)

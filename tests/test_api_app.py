@@ -56,12 +56,14 @@ def test_diagnose_ambiguous_is_409(mock_resolve):
     assert response.status_code == 409
 
 
+@patch("api.app.queue")
 @patch("api.app.job_store")
 @patch("api.app.resolve_intake")
-def test_diagnose_success_returns_202_and_job_id(mock_resolve, mock_job_store):
+def test_diagnose_success_returns_202_and_job_id(mock_resolve, mock_job_store, mock_queue):
     mock_resolve.return_value = ObjectRef(kind="Pod", namespace="ns", name="x")
     job = MagicMock(job_id="job-123")
     mock_job_store.create_job.return_value = job
+    mock_queue.count = 0
 
     response = client.post(
         "/diagnose", json={"namespace": "ns", "name": "x"}, headers=AUTH_HEADERS
@@ -70,6 +72,25 @@ def test_diagnose_success_returns_202_and_job_id(mock_resolve, mock_job_store):
     assert response.status_code == 202
     assert response.json() == {"job_id": "job-123"}
     mock_job_store.create_job.assert_called_once()
+    mock_queue.enqueue.assert_called_once()
+
+
+@patch("api.app.queue")
+@patch("api.app.job_store")
+@patch("api.app.resolve_intake")
+def test_diagnose_backpressure_returns_429_when_queue_full(
+    mock_resolve, mock_job_store, mock_queue
+):
+    mock_resolve.return_value = ObjectRef(kind="Pod", namespace="ns", name="x")
+    mock_queue.count = 999  # well past MAX_IN_FLIGHT_JOBS
+
+    response = client.post(
+        "/diagnose", json={"namespace": "ns", "name": "x"}, headers=AUTH_HEADERS
+    )
+
+    assert response.status_code == 429
+    mock_job_store.create_job.assert_not_called()
+    mock_queue.enqueue.assert_not_called()
 
 
 def test_get_diagnosis_unknown_job_is_404():
@@ -183,11 +204,12 @@ def test_postmortem_incorrect_does_not_ingest(mock_job_store, mock_ingest):
     mock_ingest.assert_not_called()
 
 
+@patch("api.app.queue")
 @patch("api.app.job_store")
 @patch("api.app.resolve_mention")
 @patch("api.app.decompose_query")
 def test_diagnose_query_single_mention_resolves(
-    mock_decompose, mock_resolve_mention, mock_job_store
+    mock_decompose, mock_resolve_mention, mock_job_store, mock_queue
 ):
     mock_decompose.return_value = [
         DetectedMention(mentioned_service="payment", notes="down")
@@ -197,6 +219,7 @@ def test_diagnose_query_single_mention_resolves(
     )
     job = MagicMock(job_id="job-abc")
     mock_job_store.create_job.return_value = job
+    mock_queue.count = 0
 
     response = client.post(
         "/diagnose/query", json={"query": "payment is down"}, headers=AUTH_HEADERS
@@ -213,11 +236,12 @@ def test_diagnose_query_single_mention_resolves(
     }
 
 
+@patch("api.app.queue")
 @patch("api.app.job_store")
 @patch("api.app.resolve_mention")
 @patch("api.app.decompose_query")
 def test_diagnose_query_compound_mixed_outcomes(
-    mock_decompose, mock_resolve_mention, mock_job_store
+    mock_decompose, mock_resolve_mention, mock_job_store, mock_queue
 ):
     mock_decompose.return_value = [
         DetectedMention(mentioned_service="payment", notes="down"),
@@ -229,6 +253,7 @@ def test_diagnose_query_compound_mixed_outcomes(
     ]
     job = MagicMock(job_id="job-abc")
     mock_job_store.create_job.return_value = job
+    mock_queue.count = 0
 
     response = client.post(
         "/diagnose/query",

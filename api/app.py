@@ -1,19 +1,28 @@
-"""The FastAPI app (spec 007, spec 008).
+"""The FastAPI app (spec 007, spec 008, spec 009).
 
 POST /diagnose resolves synchronously (fast, no LLM call) and returns a
-4xx immediately on failure; on success it schedules the agent graph in a
-background thread and returns 202 + job_id. GET /diagnose/{job_id} polls
-for status/result. POST /diagnose/query is the natural-language front
-door (spec 008): it decomposes and fuzzy-resolves synchronously too
-(slower -- an LLM call plus a cluster-wide list per mention -- but still
-"deciding what to diagnose," not "doing the diagnosis," so it follows the
-same synchronous-resolution/async-execution split as plain /diagnose).
+4xx immediately on failure; on success it enqueues the agent graph onto
+an RQ queue (spec 009 -- a separate worker process runs it, not this one)
+and returns 202 + job_id. GET /diagnose/{job_id} polls for status/result.
+POST /diagnose/query is the natural-language front door (spec 008): it
+decomposes and fuzzy-resolves synchronously too (slower -- an LLM call
+plus a cluster-wide list per mention -- but still "deciding what to
+diagnose," not "doing the diagnosis," so it follows the same
+synchronous-resolution/queued-execution split as plain /diagnose).
+
+All routes are plain `def`, not `async def`: every one of them does
+blocking work (K8s API calls, a Redis round-trip, sometimes an LLM call)
+and none of them need to coordinate with an event loop -- FastAPI runs a
+sync route in its own worker thread automatically, which is simpler here
+than the asyncio.create_task bookkeeping spec 007/008 needed before RQ
+existed to do the equivalent.
 """
 
-import asyncio
 import logging
+import os
 
 from fastapi import Depends, FastAPI, HTTPException, status
+from rq import Queue
 
 from collectors.models import ObjectRef
 from intake.models import IntakeRequest, ResolutionError
@@ -24,7 +33,7 @@ from nlintake.fuzzy_resolve import resolve_mention
 from nlintake.models import AmbiguousMatch, DetectedMention, NotFound
 
 from .auth import get_expected_token, require_bearer_token
-from .jobs import Job, job_store
+from .jobs import Job, get_redis_connection, job_store
 from .schemas import (
     DiagnoseAccepted,
     JobStatus,
@@ -34,6 +43,7 @@ from .schemas import (
     QueryRequest,
     QueryResponse,
 )
+from .tasks import run_diagnosis_job
 
 logger = logging.getLogger(__name__)
 
@@ -41,23 +51,27 @@ get_expected_token()  # fail fast at startup if the token isn't configured
 
 app = FastAPI(title="k8s-incident-agent")
 
-# asyncio.create_task() only holds a weak reference to the task it returns;
-# without something else referencing it, the task can be garbage-collected
-# mid-run. Keeping a strong reference here until each task finishes avoids
-# that (see the asyncio docs' own warning on this).
-_background_tasks: set[asyncio.Task] = set()
+queue = Queue("diagnosis", connection=get_redis_connection())
+MAX_IN_FLIGHT_JOBS = int(os.environ.get("INCIDENT_AGENT_MAX_IN_FLIGHT_JOBS", "10"))
 
 
 def _start_diagnosis_job(resolved_object: ObjectRef, notes: str | None) -> Job:
     """Shared by /diagnose and /diagnose/query -- one job-creation path so
     GET /diagnose/{job_id} behaves identically regardless of which
-    endpoint started it."""
+    endpoint started it. Backpressure here, not silent unbounded
+    queueing: past MAX_IN_FLIGHT_JOBS, callers get a 429 and can retry,
+    rather than every request being accepted and just queuing behind
+    whatever Ollama can actually process concurrently."""
+    if queue.count >= MAX_IN_FLIGHT_JOBS:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=(
+                f"too many in-flight diagnoses ({queue.count}/{MAX_IN_FLIGHT_JOBS}), "
+                "retry shortly"
+            ),
+        )
     job = job_store.create_job(resolved_object)
-    task = asyncio.create_task(
-        asyncio.to_thread(job_store.run_job, job.job_id, resolved_object, notes)
-    )
-    _background_tasks.add(task)
-    task.add_done_callback(_background_tasks.discard)
+    queue.enqueue(run_diagnosis_job, job.job_id, resolved_object, notes)
     return job
 
 
@@ -71,7 +85,7 @@ def healthz() -> dict:
     status_code=status.HTTP_202_ACCEPTED,
     dependencies=[Depends(require_bearer_token)],
 )
-async def diagnose(request: IntakeRequest) -> DiagnoseAccepted:
+def diagnose(request: IntakeRequest) -> DiagnoseAccepted:
     logger.info(
         "diagnose request: namespace=%s name=%s kind=%s",
         request.namespace, request.name, request.kind,
@@ -142,11 +156,7 @@ def submit_postmortem(job_id: str, request: PostmortemRequest) -> PostmortemAcce
 
 
 @app.post("/diagnose/query", dependencies=[Depends(require_bearer_token)])
-async def diagnose_query(request: QueryRequest) -> QueryResponse:
-    # async so _start_diagnosis_job's asyncio.create_task runs on the
-    # event loop thread -- a sync def here gets dispatched to FastAPI's
-    # worker thread pool instead, where create_task has no running loop
-    # to attach to (caught by test_diagnose_query_single_mention_resolves).
+def diagnose_query(request: QueryRequest) -> QueryResponse:
     logger.info("nl query: %r", request.query)
     mentions = decompose_query(request.query)
     return QueryResponse(mentions=[_resolve_and_start(m) for m in mentions])

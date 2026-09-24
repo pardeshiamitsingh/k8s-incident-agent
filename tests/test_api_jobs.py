@@ -1,8 +1,7 @@
-from unittest.mock import patch
+from unittest.mock import MagicMock
 
 from agent.models import Diagnosis, RemediationPlan
-from agent.state import AgentState
-from api.jobs import JobStore
+from api.jobs import KEY_PREFIX, Job, RedisJobStore
 from collectors.models import ObjectRef
 
 
@@ -11,53 +10,55 @@ def _ref() -> ObjectRef:
 
 
 def test_create_job_is_running_with_resolved_object_set():
-    store = JobStore()
+    redis_mock = MagicMock()
+    store = RedisJobStore(redis_mock, ttl_seconds=100)
+
     job = store.create_job(_ref())
 
     assert job.status == "running"
     assert job.resolved_object == _ref()
-    assert store.get_job(job.job_id) is job
+    redis_mock.set.assert_called_once_with(
+        KEY_PREFIX + job.job_id, job.model_dump_json(), ex=100
+    )
 
 
 def test_get_job_unknown_id_returns_none():
-    store = JobStore()
+    redis_mock = MagicMock()
+    redis_mock.get.return_value = None
+    store = RedisJobStore(redis_mock)
+
     assert store.get_job("does-not-exist") is None
 
 
-@patch("api.jobs.run_agent")
-def test_run_job_success_marks_completed_with_result(mock_run_agent):
-    store = JobStore()
-    job = store.create_job(_ref())
-
-    diagnosis = Diagnosis(
-        root_cause="oom", cited_evidence=["e"], cited_runbook_chunks=["c"]
-    )
-    plan = RemediationPlan(summary="s", steps=["step"])
-    mock_run_agent.return_value = AgentState(
+def test_get_job_round_trips_via_json():
+    redis_mock = MagicMock()
+    store = RedisJobStore(redis_mock)
+    job = Job(
+        job_id="abc",
+        status="completed",
         resolved_object=_ref(),
         classified_failure_classes=["OOMKilled"],
         retrieved_chunks=[],
-        diagnosis=diagnosis,
-        remediation_plan=plan,
+        diagnosis=Diagnosis(
+            root_cause="oom", cited_evidence=["e"], cited_runbook_chunks=["c"]
+        ),
+        remediation_plan=RemediationPlan(summary="s", steps=["step"]),
     )
+    redis_mock.get.return_value = job.model_dump_json()
 
-    store.run_job(job.job_id, _ref(), notes=None)
+    result = store.get_job("abc")
 
-    updated = store.get_job(job.job_id)
-    assert updated.status == "completed"
-    assert updated.classified_failure_classes == ["OOMKilled"]
-    assert updated.diagnosis == diagnosis
-    assert updated.remediation_plan == plan
+    assert result == job
+    redis_mock.get.assert_called_once_with(KEY_PREFIX + "abc")
 
 
-@patch("api.jobs.run_agent")
-def test_run_job_failure_marks_failed_with_error(mock_run_agent):
-    store = JobStore()
-    job = store.create_job(_ref())
-    mock_run_agent.side_effect = RuntimeError("ollama unreachable")
+def test_save_writes_with_configured_ttl():
+    redis_mock = MagicMock()
+    store = RedisJobStore(redis_mock, ttl_seconds=42)
+    job = Job(job_id="abc", status="running", resolved_object=_ref())
 
-    store.run_job(job.job_id, _ref(), notes=None)
+    store.save(job)
 
-    updated = store.get_job(job.job_id)
-    assert updated.status == "failed"
-    assert updated.error == "ollama unreachable"
+    redis_mock.set.assert_called_once_with(
+        KEY_PREFIX + "abc", job.model_dump_json(), ex=42
+    )
