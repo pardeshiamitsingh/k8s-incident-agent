@@ -57,7 +57,8 @@ rejected or the constitution amended first.
 | Observability | LangSmith (hosted) | Tracing only, named exception to principle 3 — see §2.3 |
 | LLM (reasoning) | Ollama, local model (start with `qwen2.5:14b` or `llama3.1:8b`, benchmark before locking in) | Must support reliable tool-calling |
 | Embeddings | Ollama (`nomic-embed-text` or `mxbai-embed-large`) | Local, no external calls |
-| Vector store | Chroma | Embedded, zero extra infra, local-first |
+| Vector store | Chroma | Embedded (single-process use) or server mode (Phase 9+, multi-process) — both local, no external data flow |
+| Job store / task queue | Redis + RQ (Phase 9+) | Named exception to the project's "zero extra infra" pattern (not a Core Principle — see amendment history); still local infra, no external call, principle 3 intact |
 | K8s access | Python `kubernetes` client, read-only ServiceAccount | Never cluster-admin |
 | Metrics (optional) | `prometheus-api-client` | Only if Prometheus is present in target cluster |
 | Logs | Loki API, fallback to `kubectl logs` | Loki preferred when available |
@@ -113,6 +114,21 @@ golden incident set before moving on.
   guess when health doesn't disambiguate either. Sits entirely in front of
   the existing `/diagnose` pipeline; changes nothing about intake,
   collection, classification, retrieval, diagnosis, or planning.
+- **Phase 9 — Concurrency and scale**: replaces the in-memory job store
+  (spec 007's own documented limitation — single process only, nothing
+  ever evicted) with Redis, and the direct `asyncio.to_thread` background
+  execution with an RQ task queue and separate worker processes, so the
+  API and diagnosis-running capacity can scale independently across
+  multiple processes on one machine. Scoped deliberately to
+  single-machine, multi-process scaling, not a distributed cluster.
+  Chroma moves to server mode for this phase (embedded `PersistentClient`
+  is not safe for the concurrent multi-process access multiple workers
+  would create — learned directly from spec 004's cross-process
+  consistency bug). No Core Principle is violated (Redis/RQ are local
+  infra the operator runs themselves, not a third-party data flow —
+  principle 3 is intact), but it does break the "zero extra infra"
+  pattern held since Phase 2 — a deliberate, named trade-off, not a
+  silent one.
 
 **Explicitly out of scope for v1** (future roadmap, needs a constitution
 amendment before being built): auto-execution of remediation steps,
@@ -161,5 +177,15 @@ multi-cluster support, non-local/hosted LLM usage, Qdrant migration.
   single-namespace scope (still only `get`/`list`/`watch`, per principle 2
   — unchanged, just wider) — noted here since it's a real scope increase,
   not silently assumed.
+- **1.5.0** (2026-09-24): Added Phase 9 (§4) — concurrency and scale.
+  Redis + RQ replace the in-memory job store and `asyncio.to_thread`
+  background execution (spec 007's own documented single-process limit),
+  and Chroma moves to server mode so multiple worker processes don't
+  reintroduce spec 004's cross-process consistency bug at larger scale.
+  Added to the Tech Stack table (§3). No Core Principle violated — this
+  is new *local* infrastructure, not a third-party data flow — but it is
+  an explicit, named break from the "zero extra infra" pattern every
+  spec since Phase 2 has held to, accepted deliberately for real
+  horizontal scaling rather than assumed silently.
 
-**Version:** 1.4.0 — 2026-09-24
+**Version:** 1.5.0 — 2026-09-24
