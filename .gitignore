@@ -4,3 +4,5 @@ __pycache__/
 .venv/
 .chroma/
 .env
+CODEBASE_GUIDE.md
+.claude/scheduled_tasks.lock
