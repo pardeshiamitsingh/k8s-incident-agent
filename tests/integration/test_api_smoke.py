@@ -229,3 +229,37 @@ def test_postmortem_flow_makes_content_retrievable(api_server):
         f"second diagnosis of the same object, got chunk ids: "
         f"{[c['id'] for c in second_result['retrieved_chunks']]}"
     )
+
+
+def test_natural_language_query_resolves_and_diagnoses(api_server):
+    """spec 008 end to end: free text -> decomposition -> fuzzy match ->
+    the same job/poll flow every other entrypoint already uses."""
+    _wait_for_pod_oom(NAMESPACE)
+    headers = {"Authorization": f"Bearer {API_TOKEN}"}
+
+    # Phrased so "oom-killed" reads as the service's name, not a symptom
+    # description -- "my oom-killed deployment" gets (correctly) parsed as
+    # someone describing an OOM symptom, not naming an object literally
+    # called "oom-killed", which real object names essentially never are.
+    response = httpx.post(
+        f"{api_server}/diagnose/query",
+        json={"query": "the service named oom-killed is broken, please diagnose it"},
+        headers=headers,
+        timeout=30,
+    )
+    assert response.status_code == 200
+    mentions = response.json()["mentions"]
+    assert mentions, "expected at least one detected mention"
+
+    resolved = [m for m in mentions if m["status"] == "resolved"]
+    assert resolved, f"expected at least one resolved mention, got {mentions}"
+    match = resolved[0]
+    assert match["resolved_object"]["name"] == "oom-killed"
+    assert match["resolved_object"]["namespace"] == NAMESPACE
+    assert match["job_id"]
+
+    result = _poll_job(api_server, match["job_id"], headers)
+    assert result["status"] == "completed"
+    assert set(result["classified_failure_classes"]) & {"OOMKilled", "CrashLoopBackOff"}
+    assert result["diagnosis"]["root_cause"]
+    assert result["remediation_plan"]["steps"]

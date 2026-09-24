@@ -55,16 +55,16 @@ def _resolve_either_kind(request: IntakeRequest) -> ObjectRef | ResolutionError:
 
 
 def _break_tie_by_health(request: IntakeRequest, pod, deployment) -> ObjectRef | ResolutionError:
-    pod_unhealthy = _pod_unhealthy(pod)
-    deployment_unhealthy = _deployment_unhealthy(deployment)
+    pod_is_unhealthy = pod_unhealthy(pod)
+    deployment_is_unhealthy = deployment_unhealthy(deployment)
     logger.info(
         "same-name collision for %s/%s: pod_unhealthy=%s deployment_unhealthy=%s",
-        request.namespace, request.name, pod_unhealthy, deployment_unhealthy,
+        request.namespace, request.name, pod_is_unhealthy, deployment_is_unhealthy,
     )
 
-    if pod_unhealthy and not deployment_unhealthy:
+    if pod_is_unhealthy and not deployment_is_unhealthy:
         return ObjectRef(kind="Pod", namespace=request.namespace, name=request.name)
-    if deployment_unhealthy and not pod_unhealthy:
+    if deployment_is_unhealthy and not pod_is_unhealthy:
         return ObjectRef(
             kind="Deployment", namespace=request.namespace, name=request.name
         )
@@ -74,8 +74,8 @@ def _break_tie_by_health(request: IntakeRequest, pod, deployment) -> ObjectRef |
         message=(
             f"Both a Pod and a Deployment named '{request.name}' exist in "
             f"namespace '{request.namespace}', and health doesn't disambiguate "
-            f"(pod_unhealthy={pod_unhealthy}, deployment_unhealthy="
-            f"{deployment_unhealthy}) -- specify kind explicitly."
+            f"(pod_unhealthy={pod_is_unhealthy}, deployment_unhealthy="
+            f"{deployment_is_unhealthy}) -- specify kind explicitly."
         ),
     )
 
@@ -109,13 +109,13 @@ def _get_deployment(namespace: str, name: str):
         raise
 
 
-def _pod_unhealthy(pod) -> bool:
+def pod_unhealthy(pod) -> bool:
     if pod.status.phase not in ("Running", "Succeeded"):
         return True
     return any(not cs.ready for cs in pod.status.container_statuses or [])
 
 
-def _deployment_unhealthy(deployment) -> bool:
+def deployment_unhealthy(deployment) -> bool:
     replicas = deployment.status.replicas or 0
     ready_replicas = deployment.status.ready_replicas or 0
     return ready_replicas != replicas

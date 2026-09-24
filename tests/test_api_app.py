@@ -11,6 +11,7 @@ from api.app import app  # noqa: E402
 from api.jobs import Job  # noqa: E402
 from collectors.models import ObjectRef  # noqa: E402
 from intake.models import ResolutionError  # noqa: E402
+from nlintake.models import AmbiguousMatch, DetectedMention, NotFound  # noqa: E402
 
 client = TestClient(app)
 AUTH_HEADERS = {"Authorization": "Bearer test-token"}
@@ -180,3 +181,96 @@ def test_postmortem_incorrect_does_not_ingest(mock_job_store, mock_ingest):
     assert response.status_code == 200
     assert response.json() == {"ingested": False}
     mock_ingest.assert_not_called()
+
+
+@patch("api.app.job_store")
+@patch("api.app.resolve_mention")
+@patch("api.app.decompose_query")
+def test_diagnose_query_single_mention_resolves(
+    mock_decompose, mock_resolve_mention, mock_job_store
+):
+    mock_decompose.return_value = [
+        DetectedMention(mentioned_service="payment", notes="down")
+    ]
+    mock_resolve_mention.return_value = ObjectRef(
+        kind="Deployment", namespace="ns", name="payment-service"
+    )
+    job = MagicMock(job_id="job-abc")
+    mock_job_store.create_job.return_value = job
+
+    response = client.post(
+        "/diagnose/query", json={"query": "payment is down"}, headers=AUTH_HEADERS
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body["mentions"]) == 1
+    mention = body["mentions"][0]
+    assert mention["status"] == "resolved"
+    assert mention["job_id"] == "job-abc"
+    assert mention["resolved_object"] == {
+        "kind": "Deployment", "namespace": "ns", "name": "payment-service"
+    }
+
+
+@patch("api.app.job_store")
+@patch("api.app.resolve_mention")
+@patch("api.app.decompose_query")
+def test_diagnose_query_compound_mixed_outcomes(
+    mock_decompose, mock_resolve_mention, mock_job_store
+):
+    mock_decompose.return_value = [
+        DetectedMention(mentioned_service="payment", notes="down"),
+        DetectedMention(mentioned_service="secrets", notes="missing"),
+    ]
+    mock_resolve_mention.side_effect = [
+        ObjectRef(kind="Deployment", namespace="ns", name="payment-service"),
+        NotFound(),
+    ]
+    job = MagicMock(job_id="job-abc")
+    mock_job_store.create_job.return_value = job
+
+    response = client.post(
+        "/diagnose/query",
+        json={"query": "payment is down, also secrets missing"},
+        headers=AUTH_HEADERS,
+    )
+
+    assert response.status_code == 200
+    mentions = response.json()["mentions"]
+    assert len(mentions) == 2
+    assert mentions[0]["status"] == "resolved"
+    assert mentions[0]["job_id"] == "job-abc"
+    assert mentions[1]["status"] == "not_found"
+    assert mentions[1]["job_id"] is None
+    # one mention failing to resolve doesn't block the other's job
+    mock_job_store.create_job.assert_called_once()
+
+
+@patch("api.app.resolve_mention")
+@patch("api.app.decompose_query")
+def test_diagnose_query_ambiguous_mention_lists_candidates(
+    mock_decompose, mock_resolve_mention
+):
+    mock_decompose.return_value = [DetectedMention(mentioned_service="payment", notes=None)]
+    mock_resolve_mention.return_value = AmbiguousMatch(
+        candidates=[
+            ObjectRef(kind="Deployment", namespace="prod", name="payment-service"),
+            ObjectRef(kind="Deployment", namespace="staging", name="payment-service"),
+        ]
+    )
+
+    response = client.post(
+        "/diagnose/query", json={"query": "payment is down"}, headers=AUTH_HEADERS
+    )
+
+    assert response.status_code == 200
+    mention = response.json()["mentions"][0]
+    assert mention["status"] == "ambiguous"
+    assert mention["job_id"] is None
+    assert len(mention["candidates"]) == 2
+
+
+def test_diagnose_query_without_token_is_401():
+    response = client.post("/diagnose/query", json={"query": "payment is down"})
+    assert response.status_code == 401

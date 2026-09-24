@@ -44,3 +44,28 @@ class PostmortemAccepted(BaseModel):
     ingested: bool
     """Mirrors `was_correct` -- lets the caller confirm whether this
     submission actually changed what future retrieval returns."""
+
+
+class QueryRequest(BaseModel):
+    """POST /diagnose/query body (spec 008)."""
+
+    query: str
+
+
+class MentionResult(BaseModel):
+    """One detected mention's resolution outcome, within `QueryResponse`."""
+
+    mentioned_service: str
+    notes: str | None
+    status: Literal["resolved", "ambiguous", "not_found"]
+    job_id: str | None = None
+    resolved_object: ObjectRef | None = None
+    candidates: list[ObjectRef] | None = None
+
+
+class QueryResponse(BaseModel):
+    """POST /diagnose/query response. Always 200 -- a well-formed query
+    that resolves none of its mentions is still a complete response, not
+    an error."""
+
+    mentions: list[MentionResult]
