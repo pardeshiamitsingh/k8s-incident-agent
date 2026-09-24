@@ -101,6 +101,18 @@ golden incident set before moving on.
   concern (reverse proxy), not something the API process handles itself.
   A CLI or web UI on top of this API is a possible future addition, not
   required for v1.
+- **Phase 8 — Natural-language intake**: fulfills what Phase 5's original
+  wording aspired to ("payment-service pods are crashing") but spec 005
+  explicitly deferred ("free-text resolution... needs its own constitution
+  amendment"). A new endpoint decomposes free text into one or more
+  service mentions (local LLM, structured output) and fuzzy-matches each
+  against live cluster object names (deterministic string matching, not
+  LLM-ranked — same reasoning as Phase 3's Classifier staying LLM-free:
+  explainable and testable beats clever). Ambiguous matches are tie-broken
+  by health, reusing spec 005's own rule, and still hard-error rather than
+  guess when health doesn't disambiguate either. Sits entirely in front of
+  the existing `/diagnose` pipeline; changes nothing about intake,
+  collection, classification, retrieval, diagnosis, or planning.
 
 **Explicitly out of scope for v1** (future roadmap, needs a constitution
 amendment before being built): auto-execution of remediation steps,
@@ -141,5 +153,13 @@ multi-cluster support, non-local/hosted LLM usage, Qdrant migration.
   not deferred. Spec 005's originally-planned CLI entrypoint is
   superseded by this API; its resolution logic is reused as a library
   call from the API's request handler instead.
+- **1.4.0** (2026-09-24): Added Phase 8 (§4) — natural-language intake,
+  layered entirely in front of the existing `/diagnose` pipeline. Picks up
+  exactly what spec 005 named as deferred ("free-text resolution... needs
+  its own constitution amendment"). Cross-namespace candidate listing for
+  fuzzy matching is a broader read-only RBAC footprint than spec 001's
+  single-namespace scope (still only `get`/`list`/`watch`, per principle 2
+  — unchanged, just wider) — noted here since it's a real scope increase,
+  not silently assumed.
 
-**Version:** 1.3.0 — 2026-09-23
+**Version:** 1.4.0 — 2026-09-24
