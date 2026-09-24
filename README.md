@@ -3,6 +3,16 @@
 Local, RAG-backed AI agent that diagnoses Kubernetes incidents and proposes
 remediation plans. Built with LangChain, LangGraph, and Ollama.
 
+## Architecture
+
+![Architecture diagram: an engineer calls the HTTP API, which resolves the object against Kubernetes, then runs a five-step agent graph (collect, classify, retrieve, diagnose, plan) that reads Kubernetes, a local Chroma vector store, and a local Ollama model, before returning a diagnosis. A separate postmortem endpoint writes confirmed-correct outcomes back into the same Chroma store.](docs/architecture.svg)
+
+Intake resolves the object first (fast, no LLM); the agent graph then runs
+collect → classify → retrieve → diagnose → plan in a background thread. The
+dashed amber path is the postmortem loop: a confirmed-correct diagnosis
+writes a new chunk into the same Chroma collection `retrieve` already
+queries — no change to that step required.
+
 ## Workflow: spec-driven development
 
 This project is developed spec-first:
