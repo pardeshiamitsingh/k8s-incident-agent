@@ -13,10 +13,11 @@ from fastapi import Depends, FastAPI, HTTPException, status
 
 from intake.models import IntakeRequest, ResolutionError
 from intake.resolve import resolve_intake
+from knowledge_base.postmortem import ingest_postmortem
 
 from .auth import get_expected_token, require_bearer_token
 from .jobs import job_store
-from .schemas import DiagnoseAccepted, JobStatus
+from .schemas import DiagnoseAccepted, JobStatus, PostmortemAccepted, PostmortemRequest
 
 logger = logging.getLogger(__name__)
 
@@ -83,3 +84,35 @@ def get_diagnosis(job_id: str) -> JobStatus:
         remediation_plan=job.remediation_plan,
         error=job.error,
     )
+
+
+@app.post(
+    "/diagnose/{job_id}/postmortem",
+    dependencies=[Depends(require_bearer_token)],
+)
+def submit_postmortem(job_id: str, request: PostmortemRequest) -> PostmortemAccepted:
+    job = job_store.get_job(job_id)
+    if job is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="unknown job_id"
+        )
+    if job.status != "completed":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"job status is '{job.status}', not 'completed' -- no diagnosis to confirm",
+        )
+
+    logger.info(
+        "postmortem for job %s: was_correct=%s", job_id, request.was_correct
+    )
+    if request.was_correct:
+        ingest_postmortem(
+            job_id=job_id,
+            resolved_object=job.resolved_object,
+            failure_classes=job.classified_failure_classes or [],
+            original_root_cause=job.diagnosis.root_cause,
+            actual_root_cause=request.actual_root_cause,
+            actual_fix=request.actual_fix,
+        )
+
+    return PostmortemAccepted(ingested=request.was_correct)

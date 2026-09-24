@@ -30,3 +30,17 @@ class JobStatus(BaseModel):
     diagnosis: Diagnosis | None = None
     remediation_plan: RemediationPlan | None = None
     error: str | None = None
+
+
+class PostmortemRequest(BaseModel):
+    """POST /diagnose/{job_id}/postmortem body (spec 004)."""
+
+    was_correct: bool
+    actual_root_cause: str
+    actual_fix: str
+
+
+class PostmortemAccepted(BaseModel):
+    ingested: bool
+    """Mirrors `was_correct` -- lets the caller confirm whether this
+    submission actually changed what future retrieval returns."""

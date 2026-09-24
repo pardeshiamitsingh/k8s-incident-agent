@@ -15,6 +15,8 @@ from pathlib import Path
 import httpx
 import pytest
 
+from knowledge_base.ingest import ingest_runbooks
+
 pytestmark = [pytest.mark.integration, pytest.mark.requires_ollama]
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -41,33 +43,51 @@ def fixtures_namespace():
 
 
 @pytest.fixture(scope="module")
-def api_server():
-    env = {**os.environ, "INCIDENT_AGENT_API_TOKEN": API_TOKEN}
-    proc = subprocess.Popen(
-        [
-            "uv", "run", "uvicorn", "api.app:app",
-            "--port", str(PORT), "--log-level", "warning",
-        ],
-        env=env,
-        cwd=REPO_ROOT,
-    )
+def api_server(tmp_path_factory):
+    # Isolated Chroma store for the whole fixture lifetime (setup, the
+    # server subprocess, AND any in-process retrieve_runbooks() calls the
+    # test body makes directly) -- this test writes real postmortem
+    # chunks (test_postmortem_flow_makes_content_retrievable), and the
+    # dev '.chroma/' directory must never accumulate test-run garbage.
+    # Discovered the hard way: a stale chunk from a prior run pushed this
+    # run's own chunk out of the top-k on a later, unrelated test run.
+    chroma_path = tmp_path_factory.mktemp("chroma")
+    previous = os.environ.get("INCIDENT_AGENT_CHROMA_PATH")
+    os.environ["INCIDENT_AGENT_CHROMA_PATH"] = str(chroma_path)
     try:
-        deadline = time.monotonic() + 30
-        healthy = False
-        while time.monotonic() < deadline:
-            try:
-                if httpx.get(f"{BASE_URL}/healthz", timeout=1).status_code == 200:
-                    healthy = True
-                    break
-            except httpx.HTTPError:
-                pass
-            time.sleep(1)
-        if not healthy:
-            pytest.fail("API server did not become healthy in time")
-        yield BASE_URL
+        ingest_runbooks()
+
+        env = {**os.environ, "INCIDENT_AGENT_API_TOKEN": API_TOKEN}
+        proc = subprocess.Popen(
+            [
+                "uv", "run", "uvicorn", "api.app:app",
+                "--port", str(PORT), "--log-level", "warning",
+            ],
+            env=env,
+            cwd=REPO_ROOT,
+        )
+        try:
+            deadline = time.monotonic() + 30
+            healthy = False
+            while time.monotonic() < deadline:
+                try:
+                    if httpx.get(f"{BASE_URL}/healthz", timeout=1).status_code == 200:
+                        healthy = True
+                        break
+                except httpx.HTTPError:
+                    pass
+                time.sleep(1)
+            if not healthy:
+                pytest.fail("API server did not become healthy in time")
+            yield BASE_URL
+        finally:
+            proc.terminate()
+            proc.wait(timeout=10)
     finally:
-        proc.terminate()
-        proc.wait(timeout=10)
+        if previous is None:
+            os.environ.pop("INCIDENT_AGENT_CHROMA_PATH", None)
+        else:
+            os.environ["INCIDENT_AGENT_CHROMA_PATH"] = previous
 
 
 def _wait_for_pod_oom(namespace: str, timeout: float = 60) -> None:
@@ -140,3 +160,72 @@ def test_full_http_flow_against_oom_killed_fixture(api_server):
     assert result["diagnosis"]["cited_evidence"]
     assert result["diagnosis"]["cited_runbook_chunks"]
     assert result["remediation_plan"]["steps"]
+
+
+def test_postmortem_flow_makes_content_retrievable(api_server):
+    """spec 004's core acceptance criterion: a correct postmortem becomes
+    retrievable via spec 002's unchanged retrieve_runbooks(), with no
+    Phase 3 code needing to change.
+
+    Verifies this by triggering a *second* /diagnose run for the same
+    object and checking its retrieved_chunks, rather than calling
+    retrieve_runbooks() directly from the test process -- Chroma's
+    PersistentClient isn't reliably consistent when a separate, still-live
+    process reads while the API subprocess may not have flushed its
+    write yet. Going through a second real request keeps everything
+    inside the one process that did the writing, and is also a more
+    realistic test of the actual feature: does a later diagnosis for a
+    similar incident actually pick up the postmortem?
+    """
+    _wait_for_pod_oom(NAMESPACE)
+    headers = {"Authorization": f"Bearer {API_TOKEN}"}
+
+    first = httpx.post(
+        f"{api_server}/diagnose",
+        json={"namespace": NAMESPACE, "name": "oom-killed"},
+        headers=headers,
+        timeout=10,
+    )
+    assert first.status_code == 202
+    job_id = first.json()["job_id"]
+
+    first_result = _poll_job(api_server, job_id, headers)
+    assert first_result["status"] == "completed"
+
+    # Realistic content matters here, not just a placeholder -- retrieval
+    # is embedding-similarity-based, and a content-free marker string
+    # embeds nowhere near "OOMKilled" semantically, so it wouldn't rank in
+    # the top-k regardless of whether ingestion worked. A real human
+    # postmortem submission would naturally read like this anyway.
+    marker = f"unique-marker-{job_id}"
+    postmortem_response = httpx.post(
+        f"{api_server}/diagnose/{job_id}/postmortem",
+        json={
+            "was_correct": True,
+            "actual_root_cause": (
+                "Confirmed: the container's memory limit was undersized for "
+                f"its actual working set, causing repeated OOM kills ({marker})"
+            ),
+            "actual_fix": "Raised the memory request and limit to 256Mi, which resolved the OOM kills",
+        },
+        headers=headers,
+        timeout=10,
+    )
+    assert postmortem_response.status_code == 200
+    assert postmortem_response.json() == {"ingested": True}
+
+    second = httpx.post(
+        f"{api_server}/diagnose",
+        json={"namespace": NAMESPACE, "name": "oom-killed"},
+        headers=headers,
+        timeout=10,
+    )
+    assert second.status_code == 202
+    second_result = _poll_job(api_server, second.json()["job_id"], headers)
+    assert second_result["status"] == "completed"
+
+    assert any(marker in c["text"] for c in second_result["retrieved_chunks"]), (
+        f"expected the postmortem chunk (marker={marker!r}) to be retrieved by a "
+        f"second diagnosis of the same object, got chunk ids: "
+        f"{[c['id'] for c in second_result['retrieved_chunks']]}"
+    )

@@ -97,3 +97,86 @@ def test_get_diagnosis_returns_job_status(mock_job_store):
     body = response.json()
     assert body["status"] == "completed"
     assert body["diagnosis"]["root_cause"] == "oom"
+
+
+def _completed_job() -> Job:
+    return Job(
+        job_id="job-123",
+        status="completed",
+        resolved_object=ObjectRef(kind="Deployment", namespace="ns", name="x"),
+        classified_failure_classes=["OOMKilled"],
+        retrieved_chunks=[],
+        diagnosis=Diagnosis(
+            root_cause="oom", cited_evidence=["e"], cited_runbook_chunks=["c"]
+        ),
+        remediation_plan=RemediationPlan(summary="s", steps=["step"]),
+    )
+
+
+def test_postmortem_unknown_job_is_404():
+    response = client.post(
+        "/diagnose/does-not-exist/postmortem",
+        json={"was_correct": True, "actual_root_cause": "x", "actual_fix": "y"},
+        headers=AUTH_HEADERS,
+    )
+    assert response.status_code == 404
+
+
+@patch("api.app.job_store")
+def test_postmortem_running_job_is_409(mock_job_store):
+    job = _completed_job()
+    job.status = "running"
+    mock_job_store.get_job.return_value = job
+
+    response = client.post(
+        "/diagnose/job-123/postmortem",
+        json={"was_correct": True, "actual_root_cause": "x", "actual_fix": "y"},
+        headers=AUTH_HEADERS,
+    )
+
+    assert response.status_code == 409
+
+
+@patch("api.app.ingest_postmortem")
+@patch("api.app.job_store")
+def test_postmortem_correct_ingests_and_returns_ingested_true(
+    mock_job_store, mock_ingest
+):
+    mock_job_store.get_job.return_value = _completed_job()
+
+    response = client.post(
+        "/diagnose/job-123/postmortem",
+        json={
+            "was_correct": True,
+            "actual_root_cause": "undersized limit",
+            "actual_fix": "raised memory limit",
+        },
+        headers=AUTH_HEADERS,
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"ingested": True}
+    mock_ingest.assert_called_once_with(
+        job_id="job-123",
+        resolved_object=ObjectRef(kind="Deployment", namespace="ns", name="x"),
+        failure_classes=["OOMKilled"],
+        original_root_cause="oom",
+        actual_root_cause="undersized limit",
+        actual_fix="raised memory limit",
+    )
+
+
+@patch("api.app.ingest_postmortem")
+@patch("api.app.job_store")
+def test_postmortem_incorrect_does_not_ingest(mock_job_store, mock_ingest):
+    mock_job_store.get_job.return_value = _completed_job()
+
+    response = client.post(
+        "/diagnose/job-123/postmortem",
+        json={"was_correct": False, "actual_root_cause": "x", "actual_fix": "y"},
+        headers=AUTH_HEADERS,
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"ingested": False}
+    mock_ingest.assert_not_called()
