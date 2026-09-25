@@ -27,6 +27,12 @@ from fastapi.staticfiles import StaticFiles
 from rq import Queue
 
 from collectors.models import ObjectRef
+from guardrails import (
+    GuardrailRejection,
+    screen_notes,
+    screen_postmortem_field,
+    screen_query,
+)
 from intake.models import IntakeRequest, ResolutionError
 from intake.resolve import resolve_intake
 from knowledge_base.postmortem import ingest_postmortem
@@ -55,6 +61,15 @@ app = FastAPI(title="k8s-incident-agent")
 
 queue = Queue("diagnosis", connection=get_redis_connection())
 MAX_IN_FLIGHT_JOBS = int(os.environ.get("INCIDENT_AGENT_MAX_IN_FLIGHT_JOBS", "10"))
+
+
+def _reject(exc: GuardrailRejection) -> HTTPException:
+    """Spec 013: structured rejection body, reason code plus a message the
+    UI can show."""
+    return HTTPException(
+        status_code=exc.status_code,
+        detail={"reason": exc.reason, "message": exc.message},
+    )
 
 
 def _start_diagnosis_job(resolved_object: ObjectRef, notes: str | None) -> Job:
@@ -92,6 +107,10 @@ def diagnose(request: IntakeRequest) -> DiagnoseAccepted:
         "diagnose request: namespace=%s name=%s kind=%s",
         request.namespace, request.name, request.kind,
     )
+    try:
+        notes = screen_notes(request.notes)
+    except GuardrailRejection as exc:
+        raise _reject(exc)
     resolution = resolve_intake(request)
     if isinstance(resolution, ResolutionError):
         code = (
@@ -102,7 +121,7 @@ def diagnose(request: IntakeRequest) -> DiagnoseAccepted:
         logger.info("resolution failed (%s): %s", resolution.reason, resolution.message)
         raise HTTPException(status_code=code, detail=resolution.message)
 
-    job = _start_diagnosis_job(resolution, request.notes)
+    job = _start_diagnosis_job(resolution, notes)
     return DiagnoseAccepted(job_id=job.job_id)
 
 
@@ -141,6 +160,12 @@ def submit_postmortem(job_id: str, request: PostmortemRequest) -> PostmortemAcce
             detail=f"job status is '{job.status}', not 'completed' -- no diagnosis to confirm",
         )
 
+    try:
+        actual_root_cause = screen_postmortem_field(request.actual_root_cause)
+        actual_fix = screen_postmortem_field(request.actual_fix)
+    except GuardrailRejection as exc:
+        raise _reject(exc)
+
     logger.info(
         "postmortem for job %s: was_correct=%s", job_id, request.was_correct
     )
@@ -150,8 +175,8 @@ def submit_postmortem(job_id: str, request: PostmortemRequest) -> PostmortemAcce
             resolved_object=job.resolved_object,
             failure_classes=job.classified_failure_classes or [],
             original_root_cause=job.diagnosis.root_cause,
-            actual_root_cause=request.actual_root_cause,
-            actual_fix=request.actual_fix,
+            actual_root_cause=actual_root_cause,
+            actual_fix=actual_fix,
         )
 
     return PostmortemAccepted(ingested=request.was_correct)
@@ -159,8 +184,12 @@ def submit_postmortem(job_id: str, request: PostmortemRequest) -> PostmortemAcce
 
 @app.post("/diagnose/query", dependencies=[Depends(require_bearer_token)])
 def diagnose_query(request: QueryRequest) -> QueryResponse:
-    logger.info("nl query: %r", request.query)
-    mentions = decompose_query(request.query)
+    try:
+        screened = screen_query(request.query)
+    except GuardrailRejection as exc:
+        raise _reject(exc)
+    logger.info("nl query (screened): %r", screened.text)
+    mentions = decompose_query(screened.text)
     return QueryResponse(mentions=[_resolve_and_start(m) for m in mentions])
 
 

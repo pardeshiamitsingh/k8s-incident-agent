@@ -3,6 +3,7 @@
 import logging
 
 from collectors.collect import collect_evidence
+from guardrails import redact_evidence
 
 from .state import AgentState
 
@@ -17,5 +18,5 @@ def collect_node(state: AgentState) -> dict:
         state.resolved_object.kind, state.resolved_object.namespace,
         state.resolved_object.name,
     )
-    evidence = collect_evidence(state.resolved_object)
+    evidence = redact_evidence(collect_evidence(state.resolved_object))
     return {"evidence": evidence}

@@ -45,6 +45,8 @@ async function api(path, options = {}) {
   if (!response.ok) {
     let detail = `HTTP ${response.status}`;
     try { detail = (await response.json()).detail || detail; } catch { /* keep */ }
+    // Spec 013 rejections carry {reason, message}; show the message.
+    if (detail && typeof detail === "object" && detail.message) detail = detail.message;
     throw new ApiError(typeof detail === "string" ? detail : JSON.stringify(detail));
   }
   return response.json();
