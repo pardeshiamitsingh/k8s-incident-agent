@@ -1,6 +1,6 @@
 # Spec: Ecommerce demo environment
 
-**Status:** draft
+**Status:** implemented
 **Constitution version this spec complies with:** 1.7.0
 
 ## Problem
@@ -18,14 +18,15 @@ content that makes the diagnoses specific to it.
 **In:**
 - A Helm chart at `demo/ecommerce/` deploying, into namespace `ecommerce`:
   `frontend`, `catalog`, `cart`, `orders`, `payment` (stateless services),
-  plus `postgres` (StatefulSet + PVC) and `redis`. Stub images only, no
+  plus `postgres` (Deployment + standalone PVC) and `redis`. Stub images only, no
   application code written for this project.
 - Failure injection via chart values (`failures.<scenario>.enabled`) driven by
   `demo/break.sh <scenario>` and `demo/heal.sh`, plus `demo/break.sh --list`.
 - Scenarios that produce failure classes the current classifier already
   recognises (see Design): OOMKilled, ImagePullBackOff,
   CreateContainerConfigError, Pending (unschedulable), ProbeFailure,
-  CrashLoopBackOff (bad database password), PVCBindingFailure.
+  CrashLoopBackOff (bad database password), and an unbound PVC (classified
+  `Pending`, see Open questions).
 - New runbooks under `knowledge_base/runbooks/` written for this app's
   topology (which service depends on what, where its config lives, what the
   fix looks like in this chart), ingested with the existing
@@ -85,7 +86,7 @@ rather than silent success. Services get realistic labels (`app`, `tier`,
 | `unschedulable-frontend` | frontend requests more CPU than any node has | Pending |
 | `bad-probe-frontend` | frontend readiness probe points at a 404 path | ProbeFailure |
 | `bad-db-password-orders` | orders gets a wrong Postgres password | CrashLoopBackOff |
-| `pvc-unbound-postgres` | Postgres PVC uses a non-existent storageClass | PVCBindingFailure |
+| `pvc-unbound-postgres` | Postgres PVC uses a non-existent storageClass | Pending (see Open questions) |
 
 **Scripts.** `break.sh <scenario>` runs `helm upgrade --reuse-values --set
 failures.<scenario>.enabled=true`; `heal.sh` runs `helm upgrade` with
@@ -131,3 +132,13 @@ planner give app-specific steps rather than generic ones.
   require deleting the PVC.
 - **Helm as tooling:** Helm is demo-only and not an agent dependency; it is
   not installed by this project (`brew install helm`).
+- **Resolved during live validation:** (1) Postgres is a Deployment plus
+  standalone PVC, not a StatefulSet, so the PVC scenario can swap claims and
+  heal without deletion (volumeClaimTemplates and storageClass are
+  immutable); it also keeps Postgres inside the Deployment kinds the agent
+  diagnoses. (2) An unbound-PVC pod surfaces as `FailedScheduling`, which the
+  classifier maps to `Pending`; `PVCBindingFailure` only fires from mount and
+  provisioning events the pod does not carry. Its runbook is keyed to
+  `Pending`. Collecting the PVC's own events would be a collector change for a
+  later spec. (3) Two scenarios also report a secondary `ProbeFailure`, which
+  is accurate (the rollout's new pod is never Ready).

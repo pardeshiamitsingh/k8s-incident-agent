@@ -1,0 +1,6 @@
+apiVersion: v2
+name: ecommerce
+description: Demo ecommerce app with toggleable failure scenarios for the k8s incident agent (spec 011)
+type: application
+version: 0.1.0
+appVersion: "1.0"

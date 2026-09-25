@@ -113,3 +113,8 @@ def ingest_runbooks(runbooks_dir: Path = RUNBOOKS_DIR) -> int:
         total, collection_name(), chroma_path(),
     )
     return total
+
+
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
+    print(f"ingested {ingest_runbooks()} chunk(s)")

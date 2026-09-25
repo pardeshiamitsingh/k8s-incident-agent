@@ -1,0 +1,17 @@
+# Failure toggles: all false = healthy app. Driven by demo/break.sh / heal.sh.
+failures:
+  oomPayment: false
+  badImageCatalog: false
+  missingSecretCart: false
+  unschedulableFrontend: false
+  badProbeFrontend: false
+  badDbPasswordOrders: false
+  pvcUnboundPostgres: false
+
+# Demo-only credentials. Never reuse outside a throwaway cluster.
+postgres:
+  user: shop
+  database: shop
+  password: shop-demo-pass
+  storage: 256Mi
+ordersDbPassword: shop-demo-pass
