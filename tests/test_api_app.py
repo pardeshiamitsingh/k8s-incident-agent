@@ -299,3 +299,23 @@ def test_diagnose_query_ambiguous_mention_lists_candidates(
 def test_diagnose_query_without_token_is_401():
     response = client.post("/diagnose/query", json={"query": "payment is down"})
     assert response.status_code == 401
+
+
+def test_ui_served_without_auth():
+    response = client.get("/ui/")
+    assert response.status_code == 200
+    assert "Incident Agent" in response.text
+
+
+def test_ui_mount_does_not_open_api_routes():
+    assert client.get("/diagnose/some-job").status_code == 401
+
+
+def test_frontend_never_uses_innerhtml():
+    # Chunk text is user-authored and untrusted (spec 010): the UI must
+    # render it with textContent only.
+    from pathlib import Path
+
+    source = (Path(__file__).parent.parent / "frontend" / "app.js").read_text()
+    assert "innerHTML" not in source
+    assert "insertAdjacentHTML" not in source

@@ -20,8 +20,10 @@ existed to do the equivalent.
 
 import logging
 import os
+from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi.staticfiles import StaticFiles
 from rq import Queue
 
 from collectors.models import ObjectRef
@@ -187,3 +189,13 @@ def _resolve_and_start(mention: DetectedMention) -> MentionResult:
         job_id=job.job_id,
         resolved_object=outcome,
     )
+
+
+# Spec 010: static UI, same origin. Mounted last so it can never shadow an
+# API route; it serves no data itself (every API call the page makes carries
+# the bearer token), so it is intentionally not behind require_bearer_token.
+app.mount(
+    "/ui",
+    StaticFiles(directory=Path(__file__).parent.parent / "frontend", html=True),
+    name="ui",
+)

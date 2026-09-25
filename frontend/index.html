@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Incident Agent</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main>
+    <h1>Kubernetes Incident Agent</h1>
+
+    <section id="token-section" hidden>
+      <label for="token">API token</label>
+      <div class="row">
+        <input id="token" type="password" autocomplete="off" placeholder="Bearer token">
+        <button id="token-save" type="button">Save</button>
+      </div>
+      <p id="token-msg" class="error" hidden></p>
+    </section>
+
+    <form id="query-form">
+      <label for="query">Describe the incident</label>
+      <textarea id="query" rows="3" placeholder="e.g. the payment service is crashing in prod"></textarea>
+      <button type="submit" id="submit">Diagnose</button>
+    </form>
+
+    <p id="status" class="muted" role="status"></p>
+    <section id="results"></section>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>

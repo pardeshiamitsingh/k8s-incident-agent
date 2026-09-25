@@ -130,6 +130,17 @@ golden incident set before moving on.
   pattern held since Phase 2 — a deliberate, named trade-off, not a
   silent one.
 
+- **Phase 10 — Web frontend**: fulfills Phase 7's "a CLI or web UI on top
+  of this API is a possible future addition." A minimal single-page UI,
+  served as static files by the existing FastAPI app (same origin), that
+  takes a natural-language query, drives `POST /diagnose/query` and the
+  job-polling endpoint, and renders the diagnosis and remediation plan.
+  Purely a client of the existing API: it adds no new diagnosis logic,
+  and the browser authenticates with the same bearer token as any other
+  client (pasted by the user, never embedded server-side). Vanilla
+  HTML/JS with no build step and no third-party scripts, so no external
+  data flow is introduced. The postmortem form is deferred.
+
 **Explicitly out of scope for v1** (future roadmap, needs a constitution
 amendment before being built): auto-execution of remediation steps,
 autonomous/continuous cluster watching (polling or webhook-triggered),
@@ -187,5 +198,11 @@ multi-cluster support, non-local/hosted LLM usage, Qdrant migration.
   an explicit, named break from the "zero extra infra" pattern every
   spec since Phase 2 has held to, accepted deliberately for real
   horizontal scaling rather than assumed silently.
+- **1.6.0** (2026-09-25): Added Phase 10 (§4) — a minimal web frontend
+  on top of the existing HTTP API, the "web UI" Phase 7 named as a
+  possible future addition. No Core Principle violated: it is a static
+  client of the existing API, uses the same bearer-token access control,
+  and loads no third-party scripts (principle 3 intact). Postmortem
+  submission from the UI is deferred to a later spec.
 
-**Version:** 1.5.0 — 2026-09-24
+**Version:** 1.6.0 — 2026-09-25
