@@ -156,6 +156,27 @@ golden incident set before moving on.
   runbooks. Widens read-only RBAC to those kinds (still only
   `get`/`list`/`watch`, principle 2 unchanged).
 
+- **Phase 13 — Input guardrails**: free text reaches the system in
+  several places (the natural-language query, `notes`, postmortem fields,
+  and pod logs and events that flow into the LLM prompt). A screening
+  pipeline runs first: normalisation and limits, PII and secret masking,
+  prompt-injection pattern matching, then a local-LLM intent classifier
+  that rejects anything that is not a Kubernetes incident (failing closed
+  if the classifier cannot decide). Collected evidence is redacted before
+  it reaches the LLM, the job store and the UI, and postmortem text is
+  screened before it is written to the knowledge base. Everything is local
+  and deterministic where possible; masking runs before any LLM or
+  LangSmith call, which also narrows what the named tracing exception
+  (principle 3) can ever transmit.
+- **Phase 14 — Hybrid retrieval**: replaces dense-only runbook retrieval
+  with dense plus BM25 candidates, fused by reciprocal-rank fusion and
+  reranked by a local cross-encoder, with retrieval queries built from
+  the class name plus evidence text. Behind an env flag (dense remains
+  the fallback) and adopted as the default only if it does not regress
+  on the golden set. Adds `rank-bm25`, `flashrank` and `langchain-community`
+  as dependencies; the reranker's model weights are a one-time setup
+  download, and nothing leaves the machine at runtime.
+
 **Explicitly out of scope for v1** (future roadmap, needs a constitution
 amendment before being built): auto-execution of remediation steps,
 autonomous/continuous cluster watching (polling or webhook-triggered),
@@ -225,5 +246,12 @@ multi-cluster support, non-local/hosted LLM usage, Qdrant migration.
   NetworkPolicy (still `get`/`list`/`watch` only, principle 2 intact) and
   is recorded here as a real scope increase rather than assumed. Helm is
   named as demo tooling only, not a runtime dependency of the agent.
+- **1.8.0** (2026-09-25): Added Phase 13 (input guardrails) and Phase 14
+  (hybrid retrieval) to §4. No Core Principle is violated. Phase 13
+  strengthens principles 3 and 5 (less data reaches any LLM or tracing
+  service; every rejection is logged) and adds no new external calls.
+  Phase 14 adds Python dependencies and a locally-run reranker model
+  (a setup-time download only), and changes retrieval behaviour, hence
+  the flag and the no-regression gate.
 
-**Version:** 1.7.0 — 2026-09-25
+**Version:** 1.8.0 — 2026-09-25
