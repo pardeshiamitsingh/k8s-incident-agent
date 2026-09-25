@@ -17,7 +17,7 @@ from pathlib import Path
 import httpx
 import pytest
 
-from knowledge_base.ingest import ingest_runbooks
+from knowledge_base.ingest import get_vector_store, ingest_runbooks
 
 pytestmark = [pytest.mark.integration, pytest.mark.requires_ollama, pytest.mark.requires_redis]
 
@@ -45,17 +45,25 @@ def fixtures_namespace():
 
 
 @pytest.fixture(scope="module")
-def api_server(tmp_path_factory):
-    # Isolated Chroma store for the whole fixture lifetime (setup, the
-    # server subprocess, AND any in-process retrieve_runbooks() calls the
-    # test body makes directly) -- this test writes real postmortem
-    # chunks (test_postmortem_flow_makes_content_retrievable), and the
-    # dev '.chroma/' directory must never accumulate test-run garbage.
-    # Discovered the hard way: a stale chunk from a prior run pushed this
-    # run's own chunk out of the top-k on a later, unrelated test run.
-    chroma_path = tmp_path_factory.mktemp("chroma")
-    previous = os.environ.get("INCIDENT_AGENT_CHROMA_PATH")
-    os.environ["INCIDENT_AGENT_CHROMA_PATH"] = str(chroma_path)
+def api_server():
+    # Since spec 009, the API and worker are separate processes, both
+    # touching Chroma -- an embedded PersistentClient isn't safe for that
+    # (spec 004's cross-process consistency bug: the postmortem write
+    # from the API process wasn't visible to the worker process's later
+    # read). Server mode fixes the cross-process visibility, but a shared
+    # server has no per-process path to isolate test runs from each other
+    # the way INCIDENT_AGENT_CHROMA_PATH did -- so this run gets its own
+    # collection instead, on the same running server. Discovered the hard
+    # way: a stale chunk from a prior run pushed this run's own chunk out
+    # of the top-k on a later, unrelated test run.
+    import uuid
+
+    collection = f"test-{uuid.uuid4().hex[:12]}"
+    previous_host = os.environ.get("INCIDENT_AGENT_CHROMA_HOST")
+    previous_collection = os.environ.get("INCIDENT_AGENT_CHROMA_COLLECTION")
+    os.environ["INCIDENT_AGENT_CHROMA_HOST"] = "localhost"
+    os.environ.setdefault("INCIDENT_AGENT_CHROMA_PORT", "8000")
+    os.environ["INCIDENT_AGENT_CHROMA_COLLECTION"] = collection
     try:
         ingest_runbooks()
 
@@ -83,8 +91,8 @@ def api_server(tmp_path_factory):
                 pytest.fail("API server did not become healthy in time")
 
             # Spec 009: an enqueued job does nothing without a worker
-            # process consuming the queue -- same env (same isolated
-            # Chroma path, same Redis) as the API process.
+            # process consuming the queue -- same env (same Chroma
+            # server + collection, same Redis) as the API process.
             worker_proc = subprocess.Popen(
                 ["uv", "run", "python", "-m", "api.worker"],
                 env=env,
@@ -98,11 +106,16 @@ def api_server(tmp_path_factory):
         finally:
             api_proc.terminate()
             api_proc.wait(timeout=10)
+            get_vector_store().delete_collection()
     finally:
-        if previous is None:
-            os.environ.pop("INCIDENT_AGENT_CHROMA_PATH", None)
+        if previous_host is None:
+            os.environ.pop("INCIDENT_AGENT_CHROMA_HOST", None)
         else:
-            os.environ["INCIDENT_AGENT_CHROMA_PATH"] = previous
+            os.environ["INCIDENT_AGENT_CHROMA_HOST"] = previous_host
+        if previous_collection is None:
+            os.environ.pop("INCIDENT_AGENT_CHROMA_COLLECTION", None)
+        else:
+            os.environ["INCIDENT_AGENT_CHROMA_COLLECTION"] = previous_collection
 
 
 def _wait_for_pod_oom(namespace: str, timeout: float = 60) -> None:

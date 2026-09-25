@@ -28,6 +28,15 @@ def chroma_path() -> Path:
     return Path(os.environ.get("INCIDENT_AGENT_CHROMA_PATH", DEFAULT_CHROMA_PATH))
 
 
+def collection_name() -> str:
+    """Overridable via `INCIDENT_AGENT_CHROMA_COLLECTION` -- server mode
+    (spec 009) has no per-process path to isolate test runs from each
+    other the way `INCIDENT_AGENT_CHROMA_PATH` does for embedded mode, so
+    a test run that wants isolation on a shared server needs its own
+    collection instead."""
+    return os.environ.get("INCIDENT_AGENT_CHROMA_COLLECTION", COLLECTION_NAME)
+
+
 def get_vector_store() -> Chroma:
     """Server mode (spec 009) when `INCIDENT_AGENT_CHROMA_HOST` is set --
     required once more than one process touches the store concurrently
@@ -40,14 +49,14 @@ def get_vector_store() -> Chroma:
         port = int(os.environ.get("INCIDENT_AGENT_CHROMA_PORT", "8000"))
         logger.debug("using Chroma server mode at %s:%d", host, port)
         return Chroma(
-            collection_name=COLLECTION_NAME,
+            collection_name=collection_name(),
             embedding_function=get_embeddings(),
             host=host,
             port=port,
         )
 
     return Chroma(
-        collection_name=COLLECTION_NAME,
+        collection_name=collection_name(),
         embedding_function=get_embeddings(),
         persist_directory=str(chroma_path()),
     )
@@ -101,6 +110,6 @@ def ingest_runbooks(runbooks_dir: Path = RUNBOOKS_DIR) -> int:
 
     logger.info(
         "ingested %d total chunk(s) into collection '%s' at %s",
-        total, COLLECTION_NAME, chroma_path(),
+        total, collection_name(), chroma_path(),
     )
     return total
