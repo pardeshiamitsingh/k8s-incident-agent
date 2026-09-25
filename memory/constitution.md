@@ -141,6 +141,21 @@ golden incident set before moving on.
   HTML/JS with no build step and no third-party scripts, so no external
   data flow is introduced. The postmortem form is deferred.
 
+- **Phase 11 — Ecommerce demo environment**: a production-style demo
+  target for the agent: a multi-service ecommerce app (frontend, catalog,
+  cart, orders, payment, plus Postgres and Redis) packaged as a Helm
+  chart under `demo/`, with a failure-injection script and app-specific
+  runbooks added to the knowledge base. Adds no agent capability and no
+  new cluster access: it exercises the failure classes the classifier
+  already handles.
+- **Phase 12 — Dependency-failure diagnosis**: teaches the agent failures
+  that live *between* workloads rather than inside one pod: cascading
+  failure (a service down because its dependency is), Service selector
+  mismatch, and NetworkPolicy blocking. Needs new collectors (Service,
+  Endpoints, NetworkPolicy), new deterministic classifier rules, and
+  runbooks. Widens read-only RBAC to those kinds (still only
+  `get`/`list`/`watch`, principle 2 unchanged).
+
 **Explicitly out of scope for v1** (future roadmap, needs a constitution
 amendment before being built): auto-execution of remediation steps,
 autonomous/continuous cluster watching (polling or webhook-triggered),
@@ -204,5 +219,11 @@ multi-cluster support, non-local/hosted LLM usage, Qdrant migration.
   client of the existing API, uses the same bearer-token access control,
   and loads no third-party scripts (principle 3 intact). Postmortem
   submission from the UI is deferred to a later spec.
+- **1.7.0** (2026-09-25): Added Phase 11 (ecommerce demo environment) and
+  Phase 12 (dependency-failure diagnosis) to §4. Phase 11 adds no agent
+  capability. Phase 12 widens read-only RBAC to Service, Endpoints and
+  NetworkPolicy (still `get`/`list`/`watch` only, principle 2 intact) and
+  is recorded here as a real scope increase rather than assumed. Helm is
+  named as demo tooling only, not a runtime dependency of the agent.
 
-**Version:** 1.6.0 — 2026-09-25
+**Version:** 1.7.0 — 2026-09-25

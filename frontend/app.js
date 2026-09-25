@@ -155,7 +155,13 @@ async function submitQuery(event) {
   event.preventDefault();
   const query = $("query").value.trim();
   if (!query) return;
-  if (!getToken()) { showTokenPrompt(); return; }
+  const typed = $("token").value.trim();
+  if (typed) { setToken(typed); $("token").value = ""; $("token-section").hidden = true; }
+  if (!getToken()) {
+    showTokenPrompt();
+    $("status").textContent = "Enter your API token above first.";
+    return;
+  }
 
   const results = $("results");
   results.textContent = "";
