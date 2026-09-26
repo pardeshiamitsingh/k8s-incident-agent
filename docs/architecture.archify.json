@@ -1,0 +1,395 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "k8s-incident-agent: runtime architecture",
+    "output": "architecture.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/pardeshiamitsingh/k8s-incident-agent",
+      "provider": "github",
+      "link_mode": "local-only",
+      "revision": "a881f0ede0a2b368798dccff515cfb6ef5606466"
+    }
+  },
+  "components": [
+    {
+      "id": "engineer",
+      "type": "external",
+      "label": "Engineer",
+      "sublabel": "Browser / curl",
+      "pos": [
+        40,
+        120
+      ],
+      "size": [
+        108,
+        64
+      ]
+    },
+    {
+      "id": "api",
+      "type": "backend",
+      "label": "FastAPI API",
+      "sublabel": "REST + UI",
+      "tag": "bearer token",
+      "pos": [
+        204,
+        120
+      ],
+      "size": [
+        108,
+        64
+      ],
+      "sources": [
+        {
+          "path": "api/app.py",
+          "label": "routes"
+        }
+      ]
+    },
+    {
+      "id": "guardrails",
+      "type": "security",
+      "label": "Guardrails",
+      "sublabel": "screen + mask",
+      "tag": "fail closed",
+      "pos": [
+        368,
+        120
+      ],
+      "size": [
+        108,
+        64
+      ],
+      "sources": [
+        {
+          "path": "guardrails/pipeline.py",
+          "label": "screen_query"
+        }
+      ]
+    },
+    {
+      "id": "intake",
+      "type": "backend",
+      "label": "NL Intake",
+      "sublabel": "resolve names",
+      "pos": [
+        532,
+        120
+      ],
+      "size": [
+        108,
+        64
+      ],
+      "sources": [
+        {
+          "path": "nlintake/decompose.py"
+        },
+        {
+          "path": "nlintake/fuzzy_resolve.py"
+        }
+      ]
+    },
+    {
+      "id": "redis",
+      "type": "messagebus",
+      "label": "Redis + RQ",
+      "sublabel": "jobs + queue",
+      "pos": [
+        696,
+        120
+      ],
+      "size": [
+        108,
+        64
+      ],
+      "sources": [
+        {
+          "path": "api/jobs.py",
+          "label": "job store"
+        }
+      ]
+    },
+    {
+      "id": "worker",
+      "type": "backend",
+      "label": "RQ Worker",
+      "sublabel": "SimpleWorker",
+      "pos": [
+        860,
+        120
+      ],
+      "size": [
+        108,
+        64
+      ],
+      "sources": [
+        {
+          "path": "api/worker.py"
+        },
+        {
+          "path": "api/tasks.py"
+        }
+      ]
+    },
+    {
+      "id": "agent",
+      "type": "backend",
+      "label": "Agent",
+      "sublabel": "LangGraph",
+      "pos": [
+        1024,
+        120
+      ],
+      "size": [
+        108,
+        64
+      ],
+      "sources": [
+        {
+          "path": "agent/graph.py",
+          "label": "run_agent"
+        }
+      ],
+      "tag": "propose-only"
+    },
+    {
+      "id": "kb",
+      "type": "database",
+      "label": "Chroma KB",
+      "sublabel": "vector store",
+      "pos": [
+        860,
+        340
+      ],
+      "size": [
+        108,
+        64
+      ],
+      "sources": [
+        {
+          "path": "knowledge_base/retrieve.py"
+        }
+      ]
+    },
+    {
+      "id": "ollama",
+      "type": "external",
+      "label": "Ollama",
+      "sublabel": "llama3.1:8b",
+      "pos": [
+        1024,
+        340
+      ],
+      "size": [
+        108,
+        64
+      ],
+      "sources": [
+        {
+          "path": "agent/llm.py"
+        }
+      ]
+    },
+    {
+      "id": "k8s",
+      "type": "external",
+      "label": "K8s API",
+      "sublabel": "target cluster",
+      "tag": "read-only",
+      "pos": [
+        1200,
+        120
+      ],
+      "size": [
+        108,
+        64
+      ],
+      "sources": [
+        {
+          "path": "collectors/collect.py"
+        }
+      ]
+    },
+    {
+      "id": "langsmith",
+      "type": "cloud",
+      "label": "LangSmith",
+      "sublabel": "hosted tracing",
+      "tag": "exception",
+      "pos": [
+        1200,
+        340
+      ],
+      "size": [
+        108,
+        64
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "Operator machine: no incident data leaves",
+      "wraps": [
+        "api",
+        "guardrails",
+        "intake",
+        "redis",
+        "worker",
+        "agent",
+        "kb",
+        "ollama"
+      ]
+    },
+    {
+      "kind": "security-group",
+      "label": "Untrusted-input gate",
+      "wraps": [
+        "api",
+        "guardrails"
+      ]
+    },
+    {
+      "kind": "region",
+      "label": "Target cluster (get/list/watch)",
+      "wraps": [
+        "k8s"
+      ]
+    },
+    {
+      "kind": "region",
+      "label": "Third-party SaaS",
+      "wraps": [
+        "langsmith"
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "engineer-to-api",
+      "from": "engineer",
+      "to": "api",
+      "label": "HTTPS",
+      "variant": "emphasis"
+    },
+    {
+      "id": "api-to-guardrails",
+      "from": "api",
+      "to": "guardrails",
+      "label": "screen",
+      "variant": "emphasis"
+    },
+    {
+      "id": "guardrails-to-intake",
+      "from": "guardrails",
+      "to": "intake",
+      "label": "masked",
+      "variant": "emphasis"
+    },
+    {
+      "id": "intake-to-redis",
+      "from": "intake",
+      "to": "redis",
+      "label": "enqueue",
+      "variant": "emphasis"
+    },
+    {
+      "id": "redis-to-worker",
+      "from": "redis",
+      "to": "worker",
+      "label": "dequeue",
+      "variant": "emphasis"
+    },
+    {
+      "id": "worker-to-agent",
+      "from": "worker",
+      "to": "agent",
+      "label": "invoke",
+      "variant": "emphasis"
+    },
+    {
+      "id": "agent-to-k8s",
+      "from": "agent",
+      "to": "k8s",
+      "label": "get/list"
+    },
+    {
+      "id": "agent-to-kb",
+      "from": "agent",
+      "to": "kb",
+      "label": "retrieve"
+    },
+    {
+      "id": "agent-to-ollama",
+      "from": "agent",
+      "to": "ollama",
+      "label": "diagnose + plan",
+      "labelDy": 30
+    },
+    {
+      "id": "agent-to-langsmith",
+      "from": "agent",
+      "to": "langsmith",
+      "label": "traces",
+      "variant": "dashed"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "Primary path",
+      "items": [
+        "A query is screened, resolved to a Deployment or Pod, then queued",
+        "The worker runs collect, classify, retrieve, diagnose, plan",
+        "The UI polls GET /diagnose/{job_id} for the result in Redis"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Untrusted input",
+      "items": [
+        "Normalise, mask PII and secrets, match injection patterns, then a local-LLM intent check",
+        "Fails closed: 422 with a reason, or 503 if screening is down",
+        "Logs and events are redacted before prompts, Redis and the UI"
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "Job execution",
+      "items": [
+        "Redis holds job state (24h TTL) and the diagnosis queue",
+        "429 backpressure past MAX_IN_FLIGHT_JOBS",
+        "SimpleWorker avoids the macOS fork crash; Chroma runs in server mode"
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "Agent and knowledge",
+      "items": [
+        "A deterministic classifier feeds retrieval (dense default, hybrid opt-in)",
+        "Diagnoses cite evidence and runbook chunks",
+        "Confirmed postmortems are written back to Chroma"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Trust boundaries",
+      "items": [
+        "Bearer token on every API call; the UI keeps it in sessionStorage",
+        "Cluster access is read-only; the agent never mutates state",
+        "Only LangSmith traces leave the machine, after masking"
+      ]
+    },
+    {
+      "dot": "slate",
+      "title": "Also calls (not drawn)",
+      "items": [
+        "NL Intake calls Ollama and lists cluster objects to match names",
+        "The API reads job state from Redis directly",
+        "Guardrails call Ollama for the intent check"
+      ]
+    }
+  ]
+}

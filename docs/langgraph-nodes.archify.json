@@ -1,0 +1,279 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "LangGraph agent: how the nodes interact",
+    "output": "langgraph-nodes.html",
+    "quality_profile": "showcase"
+  },
+  "components": [
+    {
+      "id": "caller",
+      "type": "external",
+      "label": "run_agent",
+      "sublabel": "object + notes",
+      "pos": [
+        40,
+        100
+      ],
+      "size": [
+        116,
+        64
+      ]
+    },
+    {
+      "id": "collect",
+      "type": "backend",
+      "label": "collect",
+      "sublabel": "read + redact",
+      "pos": [
+        224,
+        100
+      ],
+      "size": [
+        116,
+        64
+      ],
+      "tag": "read-only"
+    },
+    {
+      "id": "classify",
+      "type": "backend",
+      "label": "classify",
+      "sublabel": "reason table",
+      "pos": [
+        408,
+        100
+      ],
+      "size": [
+        116,
+        64
+      ],
+      "tag": "no LLM"
+    },
+    {
+      "id": "retrieve",
+      "type": "backend",
+      "label": "retrieve",
+      "sublabel": "runbook chunks",
+      "pos": [
+        592,
+        100
+      ],
+      "size": [
+        116,
+        64
+      ],
+      "tag": "dense | hybrid"
+    },
+    {
+      "id": "diagnose",
+      "type": "backend",
+      "label": "diagnose",
+      "sublabel": "cited root cause",
+      "pos": [
+        776,
+        100
+      ],
+      "size": [
+        116,
+        64
+      ],
+      "tag": "LLM"
+    },
+    {
+      "id": "plan",
+      "type": "backend",
+      "label": "plan",
+      "sublabel": "propose-only steps",
+      "pos": [
+        960,
+        100
+      ],
+      "size": [
+        116,
+        64
+      ],
+      "tag": "LLM"
+    },
+    {
+      "id": "k8s",
+      "type": "external",
+      "label": "K8s API",
+      "sublabel": "events + logs",
+      "pos": [
+        224,
+        300
+      ],
+      "size": [
+        116,
+        64
+      ]
+    },
+    {
+      "id": "chroma",
+      "type": "database",
+      "label": "Chroma KB",
+      "sublabel": "runbooks",
+      "pos": [
+        592,
+        300
+      ],
+      "size": [
+        116,
+        64
+      ]
+    },
+    {
+      "id": "ollama",
+      "type": "external",
+      "label": "Ollama",
+      "sublabel": "llama3.1:8b",
+      "pos": [
+        960,
+        300
+      ],
+      "size": [
+        116,
+        64
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "Graph nodes share one AgentState",
+      "wraps": [
+        "collect",
+        "classify",
+        "retrieve",
+        "diagnose",
+        "plan"
+      ]
+    },
+    {
+      "kind": "region",
+      "label": "External services (local except the cluster)",
+      "wraps": [
+        "k8s",
+        "chroma",
+        "ollama"
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "caller-collect",
+      "from": "caller",
+      "to": "collect",
+      "label": "state in",
+      "variant": "emphasis"
+    },
+    {
+      "id": "collect-classify",
+      "from": "collect",
+      "to": "classify",
+      "label": "evidence",
+      "variant": "emphasis"
+    },
+    {
+      "id": "classify-retrieve",
+      "from": "classify",
+      "to": "retrieve",
+      "label": "classes",
+      "variant": "emphasis"
+    },
+    {
+      "id": "retrieve-diagnose",
+      "from": "retrieve",
+      "to": "diagnose",
+      "label": "chunks",
+      "variant": "emphasis"
+    },
+    {
+      "id": "diagnose-plan",
+      "from": "diagnose",
+      "to": "plan",
+      "label": "diagnosis",
+      "variant": "emphasis"
+    },
+    {
+      "id": "collect-k8s",
+      "from": "collect",
+      "to": "k8s",
+      "label": "get/list",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelDy": 60
+    },
+    {
+      "id": "retrieve-chroma",
+      "from": "retrieve",
+      "to": "chroma",
+      "label": "query",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelDy": 60
+    },
+    {
+      "id": "diagnose-ollama",
+      "from": "diagnose",
+      "to": "ollama",
+      "label": "structured",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "left"
+    },
+    {
+      "id": "plan-ollama",
+      "from": "plan",
+      "to": "ollama",
+      "label": "structured",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelDy": 60
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Shared state, no direct calls",
+      "items": [
+        "Nodes never call each other; each returns a partial dict that LangGraph merges into AgentState",
+        "The caller sets resolved_object and notes; every later field has one writer"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Who writes what",
+      "items": [
+        "collect: evidence",
+        "classify: classified_failure_classes",
+        "retrieve: retrieved_chunks",
+        "diagnose: diagnosis",
+        "plan: remediation_plan (final output)"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "LLM use and guardrails",
+      "items": [
+        "Only diagnose and plan call the LLM; classify is a deterministic reason table",
+        "Citations must be non-empty, so an uncited diagnosis fails",
+        "collect redacts PII, secrets and injection-like log lines; prompts treat evidence as untrusted data"
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "Linear by design",
+      "items": [
+        "Five edges: entry at collect, plan ends the run; no branches or loops in v1",
+        "A node error fails the run and the job",
+        "Retrieval runs once per failure class (3 chunks each); Unknown falls back to a raw-text query"
+      ]
+    }
+  ]
+}
