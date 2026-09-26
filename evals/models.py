@@ -12,6 +12,9 @@ class GoldenCase(BaseModel):
     expected_failure_classes: list[str]
     root_cause_keywords: list[str]
     remediation_keywords: list[str]
+    # Spec 014 retrieval check: runbook file stems that should be retrieved.
+    # Empty means "the runbook named like this case's id".
+    expected_runbooks: list[str] = []
 
 
 class CaseResult(BaseModel):

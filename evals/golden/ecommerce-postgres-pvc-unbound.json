@@ -1,0 +1,124 @@
+{
+  "id": "ecommerce-postgres-pvc-unbound",
+  "evidence": {
+    "object_ref": {
+      "kind": "Deployment",
+      "namespace": "ecommerce",
+      "name": "postgres"
+    },
+    "collected_at": "2026-09-26T02:29:35.750658Z",
+    "events": [
+      {
+        "reason": "ScalingReplicaSet",
+        "message": "Scaled up replica set postgres-6b8c78b65d from 0 to 1",
+        "type": "Normal",
+        "count": 2,
+        "first_seen": "2026-09-25T13:47:17Z",
+        "last_seen": "2026-09-25T13:54:06Z",
+        "source_component": "deployment-controller"
+      },
+      {
+        "reason": "ScalingReplicaSet",
+        "message": "Scaled down replica set postgres-6b8c78b65d from 1 to 0",
+        "type": "Normal",
+        "count": 2,
+        "first_seen": "2026-09-25T13:51:04Z",
+        "last_seen": "2026-09-26T00:39:00Z",
+        "source_component": "deployment-controller"
+      },
+      {
+        "reason": "ScalingReplicaSet",
+        "message": "Scaled up replica set postgres-67d75588dc from 0 to 1",
+        "type": "Normal",
+        "count": 2,
+        "first_seen": "2026-09-25T13:51:04Z",
+        "last_seen": "2026-09-26T00:39:00Z",
+        "source_component": "deployment-controller"
+      },
+      {
+        "reason": "ScalingReplicaSet",
+        "message": "Scaled down replica set postgres-67d75588dc from 1 to 0",
+        "type": "Normal",
+        "count": 1,
+        "first_seen": "2026-09-25T13:54:05Z",
+        "last_seen": "2026-09-25T13:54:05Z",
+        "source_component": "deployment-controller"
+      }
+    ],
+    "describe": {
+      "phase": "Progressing",
+      "conditions": [
+        {
+          "type": "Progressing",
+          "status": "True",
+          "reason": "NewReplicaSetAvailable",
+          "message": "ReplicaSet \"postgres-6b8c78b65d\" has successfully progressed."
+        },
+        {
+          "type": "Available",
+          "status": "False",
+          "reason": "MinimumReplicasUnavailable",
+          "message": "Deployment does not have minimum availability."
+        }
+      ],
+      "container_statuses": [],
+      "owner_references": []
+    },
+    "logs": {},
+    "pods": [
+      {
+        "object_ref": {
+          "kind": "Pod",
+          "namespace": "ecommerce",
+          "name": "postgres-67d75588dc-sgr5h"
+        },
+        "collected_at": "2026-09-26T02:29:35.750647Z",
+        "events": [
+          {
+            "reason": "FailedScheduling",
+            "message": "0/1 nodes are available: pod has unbound immediate PersistentVolumeClaims. not found",
+            "type": "Warning",
+            "count": 1,
+            "first_seen": "2026-09-26T00:39:00Z",
+            "last_seen": "2026-09-26T00:39:00Z",
+            "source_component": "default-scheduler"
+          }
+        ],
+        "describe": {
+          "phase": "Pending",
+          "conditions": [
+            {
+              "type": "PodScheduled",
+              "status": "False",
+              "reason": "Unschedulable",
+              "message": "0/1 nodes are available: pod has unbound immediate PersistentVolumeClaims. not found"
+            }
+          ],
+          "container_statuses": [],
+          "owner_references": [
+            {
+              "kind": "ReplicaSet",
+              "name": "postgres-67d75588dc",
+              "uid": "32c93af7-721b-47b6-a341-b76d575d270d",
+              "controller": true
+            }
+          ]
+        },
+        "logs": {},
+        "pods": []
+      }
+    ]
+  },
+  "expected_failure_classes": [
+    "Pending"
+  ],
+  "root_cause_keywords": [
+    "volume",
+    "claim",
+    "storage"
+  ],
+  "remediation_keywords": [
+    "storageclass",
+    "claim"
+  ]
+}

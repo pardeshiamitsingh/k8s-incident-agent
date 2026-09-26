@@ -1,0 +1,243 @@
+{
+  "id": "ecommerce-payment-oom",
+  "evidence": {
+    "object_ref": {
+      "kind": "Deployment",
+      "namespace": "ecommerce",
+      "name": "payment"
+    },
+    "collected_at": "2026-09-25T18:17:13.713714Z",
+    "events": [
+      {
+        "reason": "ScalingReplicaSet",
+        "message": "Scaled up replica set payment-697b748696 from 0 to 1",
+        "type": "Normal",
+        "count": 2,
+        "first_seen": "2026-09-25T13:47:17Z",
+        "last_seen": "2026-09-25T13:49:44Z",
+        "source_component": "deployment-controller"
+      },
+      {
+        "reason": "ScalingReplicaSet",
+        "message": "Scaled up replica set payment-5d8465979d from 0 to 1",
+        "type": "Normal",
+        "count": 2,
+        "first_seen": "2026-09-25T13:49:14Z",
+        "last_seen": "2026-09-25T18:16:23Z",
+        "source_component": "deployment-controller"
+      },
+      {
+        "reason": "ScalingReplicaSet",
+        "message": "Scaled down replica set payment-697b748696 from 1 to 0",
+        "type": "Normal",
+        "count": 2,
+        "first_seen": "2026-09-25T13:49:15Z",
+        "last_seen": "2026-09-25T18:16:24Z",
+        "source_component": "deployment-controller"
+      },
+      {
+        "reason": "ScalingReplicaSet",
+        "message": "Scaled down replica set payment-5d8465979d from 1 to 0",
+        "type": "Normal",
+        "count": 1,
+        "first_seen": "2026-09-25T13:49:46Z",
+        "last_seen": "2026-09-25T13:49:46Z",
+        "source_component": "deployment-controller"
+      }
+    ],
+    "describe": {
+      "phase": "Progressing",
+      "conditions": [
+        {
+          "type": "Progressing",
+          "status": "True",
+          "reason": "NewReplicaSetAvailable",
+          "message": "ReplicaSet \"payment-5d8465979d\" has successfully progressed."
+        },
+        {
+          "type": "Available",
+          "status": "False",
+          "reason": "MinimumReplicasUnavailable",
+          "message": "Deployment does not have minimum availability."
+        }
+      ],
+      "container_statuses": [],
+      "owner_references": []
+    },
+    "logs": {},
+    "pods": [
+      {
+        "object_ref": {
+          "kind": "Pod",
+          "namespace": "ecommerce",
+          "name": "payment-5d8465979d-x5t9w"
+        },
+        "collected_at": "2026-09-25T18:17:13.713704Z",
+        "events": [
+          {
+            "reason": "Scheduled",
+            "message": "Successfully assigned ecommerce/payment-5d8465979d-x5t9w to k8s-incident-agent-control-plane",
+            "type": "Normal",
+            "count": 1,
+            "first_seen": "2026-09-25T18:16:23Z",
+            "last_seen": "2026-09-25T18:16:23Z",
+            "source_component": "default-scheduler"
+          },
+          {
+            "reason": "Pulling",
+            "message": "Pulling image \"polinux/stress\"",
+            "type": "Normal",
+            "count": 4,
+            "first_seen": "2026-09-25T18:16:23Z",
+            "last_seen": "2026-09-25T18:17:03Z",
+            "source_component": "kubelet"
+          },
+          {
+            "reason": "Pulled",
+            "message": "Successfully pulled image \"polinux/stress\" in 1.076s (1.076s including waiting). Image size: 4041495 bytes.",
+            "type": "Normal",
+            "count": 1,
+            "first_seen": "2026-09-25T18:16:24Z",
+            "last_seen": "2026-09-25T18:16:24Z",
+            "source_component": "kubelet"
+          },
+          {
+            "reason": "Created",
+            "message": "Container created",
+            "type": "Normal",
+            "count": 4,
+            "first_seen": "2026-09-25T18:16:24Z",
+            "last_seen": "2026-09-25T18:17:04Z",
+            "source_component": "kubelet"
+          },
+          {
+            "reason": "Started",
+            "message": "Container started",
+            "type": "Normal",
+            "count": 4,
+            "first_seen": "2026-09-25T18:16:24Z",
+            "last_seen": "2026-09-25T18:17:04Z",
+            "source_component": "kubelet"
+          },
+          {
+            "reason": "Pulled",
+            "message": "Successfully pulled image \"polinux/stress\" in 1.116s (1.116s including waiting). Image size: 4041495 bytes.",
+            "type": "Normal",
+            "count": 1,
+            "first_seen": "2026-09-25T18:16:26Z",
+            "last_seen": "2026-09-25T18:16:26Z",
+            "source_component": "kubelet"
+          },
+          {
+            "reason": "BackOff",
+            "message": "Back-off restarting failed container payment in pod payment-5d8465979d-x5t9w_ecommerce(487f6e74-338f-46b7-a7ed-6e3e5bcf0413)",
+            "type": "Warning",
+            "count": 4,
+            "first_seen": "2026-09-25T18:16:27Z",
+            "last_seen": "2026-09-25T18:17:05Z",
+            "source_component": "kubelet"
+          },
+          {
+            "reason": "Pulled",
+            "message": "Successfully pulled image \"polinux/stress\" in 1.199s (1.199s including waiting). Image size: 4041495 bytes.",
+            "type": "Normal",
+            "count": 1,
+            "first_seen": "2026-09-25T18:16:41Z",
+            "last_seen": "2026-09-25T18:16:41Z",
+            "source_component": "kubelet"
+          },
+          {
+            "reason": "Pulled",
+            "message": "Successfully pulled image \"polinux/stress\" in 1.146s (1.146s including waiting). Image size: 4041495 bytes.",
+            "type": "Normal",
+            "count": 1,
+            "first_seen": "2026-09-25T18:17:04Z",
+            "last_seen": "2026-09-25T18:17:04Z",
+            "source_component": "kubelet"
+          }
+        ],
+        "describe": {
+          "phase": "Running",
+          "conditions": [
+            {
+              "type": "PodReadyToStartContainers",
+              "status": "True",
+              "reason": null,
+              "message": null
+            },
+            {
+              "type": "Initialized",
+              "status": "True",
+              "reason": null,
+              "message": null
+            },
+            {
+              "type": "Ready",
+              "status": "False",
+              "reason": "ContainersNotReady",
+              "message": "containers with unready status: [payment]"
+            },
+            {
+              "type": "ContainersReady",
+              "status": "False",
+              "reason": "ContainersNotReady",
+              "message": "containers with unready status: [payment]"
+            },
+            {
+              "type": "PodScheduled",
+              "status": "True",
+              "reason": null,
+              "message": null
+            }
+          ],
+          "container_statuses": [
+            {
+              "name": "payment",
+              "state": {
+                "phase": "terminated",
+                "reason": "OOMKilled",
+                "message": null
+              },
+              "restart_count": 3,
+              "image": "docker.io/polinux/stress:latest",
+              "resource_requests": {
+                "cpu": "10m",
+                "memory": "32Mi"
+              },
+              "resource_limits": {
+                "memory": "64Mi"
+              }
+            }
+          ],
+          "owner_references": [
+            {
+              "kind": "ReplicaSet",
+              "name": "payment-5d8465979d",
+              "uid": "fd75d879-a1f3-46f9-bc99-12c2d170c094",
+              "controller": true
+            }
+          ]
+        },
+        "logs": {
+          "payment": {
+            "current": "b'stress: info: [1] dispatching hogs: 0 cpu, 0 io, 1 vm, 0 hdd\\n'",
+            "previous": "b'unable to retrieve container logs for containerd://1c303561a5c739c34da3c7c3f5b1a5372c853c761d2f64fe1c517234e32022bd'"
+          }
+        },
+        "pods": []
+      }
+    ]
+  },
+  "expected_failure_classes": [
+    "OOMKilled"
+  ],
+  "root_cause_keywords": [
+    "memory",
+    "OOM",
+    "limit"
+  ],
+  "remediation_keywords": [
+    "memory limit",
+    "limit"
+  ]
+}

@@ -61,5 +61,8 @@
     "leak",
     "application-level",
     "fix"
+  ],
+  "expected_runbooks": [
+    "oom-killed"
   ]
 }

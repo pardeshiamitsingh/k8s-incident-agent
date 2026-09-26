@@ -99,5 +99,9 @@
   "remediation_keywords": [
     "memory",
     "image"
+  ],
+  "expected_runbooks": [
+    "image-pull-backoff",
+    "oom-killed"
   ]
 }

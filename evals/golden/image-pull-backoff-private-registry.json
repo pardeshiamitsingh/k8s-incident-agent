@@ -62,5 +62,8 @@
     "imagepullsecret",
     "credential",
     "registry"
+  ],
+  "expected_runbooks": [
+    "image-pull-backoff"
   ]
 }

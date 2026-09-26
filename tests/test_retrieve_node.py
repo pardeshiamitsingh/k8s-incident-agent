@@ -73,3 +73,54 @@ def test_retrieve_node_unknown_falls_back_to_raw_text_query(mock_retrieve):
     query_used = mock_retrieve.call_args.args[0]
     assert "SomeWeirdReason" in query_used
     assert result["retrieved_chunks"] == [_chunk("some#chunk", "Something")]
+
+
+# --- spec 014: evidence-aware queries in hybrid mode -------------------------
+
+from agent.retrieve_node import EVIDENCE_QUERY_MAX_CHARS, retrieve_for_failure_classes  # noqa: E402
+from collectors.models import (  # noqa: E402
+    IncidentEvidence, K8sEvent, LogsSnapshot, ObjectDescribeSnapshot, ObjectRef,
+)
+
+
+def _evidence_with(log: str, event_message: str = "Back-off restarting failed container") -> IncidentEvidence:
+    now = "2026-01-01T00:00:00Z"
+    return IncidentEvidence(
+        object_ref=ObjectRef(kind="Pod", namespace="ns", name="p"),
+        collected_at=now,
+        events=[
+            K8sEvent(reason="Pulled", type="Normal", count=1, first_seen=now, last_seen=now, message="image pulled"),
+            K8sEvent(reason="BackOff", type="Warning", count=3, first_seen=now, last_seen=now, message=event_message),
+        ],
+        describe=ObjectDescribeSnapshot(phase="Running"),
+        logs={"app": LogsSnapshot(current=log)},
+    )
+
+
+@patch("agent.retrieve_node.retrieve_runbooks", return_value=[])
+def test_dense_mode_query_is_the_class_name_alone(mock_retrieve, monkeypatch):
+    monkeypatch.setenv("INCIDENT_AGENT_RETRIEVAL_MODE", "dense")
+    retrieve_for_failure_classes(["CrashLoopBackOff"], _evidence_with("FATAL: password authentication failed"))
+    assert mock_retrieve.call_args.args[0] == "CrashLoopBackOff"
+
+
+@patch("agent.retrieve_node.retrieve_runbooks", return_value=[])
+def test_hybrid_query_has_class_log_tail_and_warning_events_but_not_normal_events(mock_retrieve, monkeypatch):
+    monkeypatch.setenv("INCIDENT_AGENT_RETRIEVAL_MODE", "hybrid")
+    retrieve_for_failure_classes(["CrashLoopBackOff"], _evidence_with("FATAL: password authentication failed"))
+    query = mock_retrieve.call_args.args[0]
+    assert query.startswith("CrashLoopBackOff: ")
+    assert "password authentication failed" in query
+    assert "BackOff" in query
+    assert "image pulled" not in query
+
+
+@patch("agent.retrieve_node.retrieve_runbooks", return_value=[])
+def test_hybrid_query_is_truncated_but_keeps_the_log_tail_first(mock_retrieve, monkeypatch):
+    monkeypatch.setenv("INCIDENT_AGENT_RETRIEVAL_MODE", "hybrid")
+    retrieve_for_failure_classes(
+        ["OOMKilled"], _evidence_with("LOGMARKER", event_message="x" * 2000)
+    )
+    query = mock_retrieve.call_args.args[0]
+    assert len(query) <= EVIDENCE_QUERY_MAX_CHARS
+    assert "LOGMARKER" in query

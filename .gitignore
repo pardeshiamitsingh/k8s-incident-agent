@@ -6,3 +6,4 @@ __pycache__/
 .env
 CODEBASE_GUIDE.md
 .claude/scheduled_tasks.lock
+.cache/

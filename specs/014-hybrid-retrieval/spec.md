@@ -1,6 +1,6 @@
 # Spec: Hybrid retrieval
 
-**Status:** draft
+**Status:** implemented (hybrid is opt-in; `dense` remains the default, see Results)
 **Constitution version this spec complies with:** 1.8.0
 
 ## Problem
@@ -131,3 +131,54 @@ from the live ecommerce scenarios with `expected_runbook` set to the matching
 - **`langchain-community` weight:** it pulls a large dependency tree for two
   classes; if that proves painful, BM25 can be a small in-repo implementation
   instead.
+
+## Results (measured 2026-09-26)
+
+`uv run python -m evals.retrieval_check` over 22 golden cases (15 original plus
+7 recorded from the ecommerce demo), expected runbook present in the
+top-3-per-class merged set:
+
+| Mode | Hit rate | MRR | p95 latency |
+|---|---|---|---|
+| dense | 17/22 = 0.77 | 0.629 | 39 ms |
+| hybrid | 17/22 = 0.77 | 0.636 | 487 ms |
+
+Which cases differ: hybrid fixes `dns-resolution-failure` and
+`ecommerce-catalog-image-pull`, and loses `image-pull-backoff` and
+`ecommerce-frontend-bad-probe`. Both modes miss `app-rbac-denied`,
+`stuck-terminating` (their classes are not reachable by the deterministic
+classifier, so they take the `Unknown` raw-text path) and `ecommerce-orders-db-auth`
+(the recorded evidence classified as `ProbeFailure` only, so the class-keyed
+query never reaches the orders runbook).
+
+**Verdict: the acceptance criteria are not met, so `dense` stays the default.**
+The literal gate (hybrid >= dense on hit rate) passes only as a tie. The
+criteria that would justify the change do not: hybrid is not strictly better on
+the ecommerce cases (2 misses each), and its overhead is roughly 450 ms against a
+300 ms budget. The implementation ships behind
+`INCIDENT_AGENT_RETRIEVAL_MODE=hybrid` for anyone who wants it.
+
+**Why the gain is small:** the corpus is about 50 chunks, and the dominant failure
+is slot competition, not ranking quality. Each class gets 3 slots, generic and
+app-specific runbooks share a class, and the cross-encoder's ordering swaps which
+of them wins rather than surfacing both. Two misses are classification problems
+that no retriever can fix.
+
+**What would change the answer** (each a separate decision, not done here): raising
+`CHUNKS_PER_FAILURE_CLASS` from 3 to 4 or 5 so generic and specific runbooks both
+fit; a classifier that reports classes for the log-only failures; or retrying
+this comparison once the corpus is much larger.
+
+## Notes from implementation
+
+- `FlashrankRerank` rebuilds documents without their ids and records each result's
+  index into the input list; the retriever uses that index to return the original
+  documents, so chunk ids and citations are identical across modes.
+- The runtime never downloads the model: `_reranker_client` returns `None` if the
+  model directory is absent (with a warning naming `fetch_reranker`), and hybrid
+  degrades to the fused order.
+- `langchain-community` emits a sunset deprecation warning on import; it is used
+  for `BM25Retriever` and `FlashrankRerank` only. Swapping in an in-repo BM25 is the
+  exit if the package is removed.
+- `GoldenCase` gained optional `expected_runbooks` for cases whose id is not a
+  runbook file stem (three existing cases).
